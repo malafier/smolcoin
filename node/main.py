@@ -1,86 +1,126 @@
 import requests
 from flask import Flask, jsonify, request
 
-app = Flask(__name__)
 
-known_peers = set()
-messages = []
+class Node:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
 
+        self.peers = set()  # Peers are stored as (host, port) tuples
+        self.app = Flask(__name__)
+        self.register_routes()
 
-@app.route("/message", methods=["POST"])
-def receive_message():
-    data = request.get_json()
-    msg = data.get("message")
-    sender = data.get("sender")
+    def register_routes(self):
+        @self.app.route("/")
+        def index():
+            return f"Node running on {self.host}:{self.port}"
 
-    if msg:
-        messages.append((sender, msg))
-        print(f"📩 Message from {sender}: {msg}")
-    return jsonify({"status": "ok"}), 200
+        @self.app.route("/peer", methods=["POST"])
+        def add_peer():
+            """
+            Endpoint to add a new peer to the node's peer list.
+            Expects JSON data: {"host": "...", "port": ...}
+            """
+            data = request.get_json()
+            if not data or "host" not in data or "port" not in data:
+                return (
+                    jsonify({"error": "Invalid data. 'host' and 'port' are required."}),
+                    400,
+                )
 
+            peer_host = data["host"]
+            peer_port = int(data["port"])
 
-@app.route("/send", methods=["POST"])
-def send_message():
-    data = request.get_json()
-    msg = data.get("message")
-    if not msg:
-        return jsonify({"error": "No message provided"}), 400
+            # Don't add self
+            if peer_host == self.host and peer_port == self.port:
+                return jsonify({"message": "Cannot add self as peer."}), 200
 
-    for peer in known_peers:
-        try:
-            requests.post(
-                f"http://{peer}/message", json={"sender": request.host, "message": msg}
+            peer_address = (peer_host, peer_port)
+            self.peers.add(peer_address)
+
+            print(f"Added new peer: {peer_host}:{peer_port}")
+            return (
+                jsonify(
+                    {"message": "Peer added successfully.", "peers": list(self.peers)}
+                ),
+                201,
             )
-        except Exception as e:
-            print(f"⚠️ Could not send to {peer}: {e}")
 
-    return jsonify({"status": "sent", "message": msg}), 200
+        @self.app.route("/peers", methods=["GET"])
+        def get_peers():
+            return jsonify({"peers": list(self.peers)}), 200
+
+        @self.app.route("/message", methods=["POST"])
+        def receive_message():
+            data = request.get_json()
+            if not data or "message" not in data:
+                return jsonify({"error": "Invalid data. 'message' is required."}), 400
+
+            message = data["message"]
+            sender = data.get("sender", "Unknown")  # Optionally, see who sent it
+
+            # In a real app, you'd process this message (e.g., add to a blockchain, etc.)
+            print(f"\n[Message Received from {sender}]: {message}\n")
+
+            return jsonify({"message": "Message received."}), 200
+
+        @self.app.route("/broadcast", methods=["POST"])
+        def broadcast_message_route():
+            data = request.get_json()
+            if not data or "message" not in data:
+                return jsonify({"error": "Invalid data. 'message' is required."}), 400
+
+            self.broadcast_message(data["message"])
+            return jsonify({"message": "Broadcast initiated."}), 200
+
+    def broadcast_message(self, message):
+        print(f"Broadcasting message to {len(self.peers)} peer(s)...")
+        payload = {"message": message, "sender": f"{self.host}:{self.port}"}
+
+        for peer_host, peer_port in list(self.peers):
+            url = f"http://{peer_host}:{peer_port}"
+            try:
+                requests.post(url + "/message", json=payload, timeout=2)
+                print(f"  - Sent to {peer_host}:{peer_port}")
+            except requests.exceptions.RequestException as e:
+                print(f"  - Failed to send to {peer_host}:{peer_port}. Error: {e}")
+                try:
+                    requests.get(url)
+                except:
+                    print(
+                        f"  - Failed to send to connect to {peer_host}:{peer_port}. Peer removed. Error: {e}"
+                    )
+                    self.peers.remove((peer_host, peer_port))
+
+    def run(self):
+        print(f"Starting node on http://{self.host}:{self.port}")
+        self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
 
 
-@app.route("/peers", methods=["GET", "POST"])
-def peers():
-    if request.method == "POST":
-        data = request.get_json()
-        peer = data.get("peer")
-        if peer:
-            known_peers.add(peer)
-        return jsonify({"peers": list(known_peers)})
-    else:
-        return jsonify({"peers": list(known_peers)})
-
-
-@app.route("/")
-def home():
-    return jsonify({"known_peers": list(known_peers), "messages": messages})
-
-
-def connect_to_new_peers():
-    while len(known_peers) < 3:
-        for peer in known_peers:
-            new_peers = requests.get(f"http://{peer}/peers")
-            for np in new_peers:
-                known_peers.add(np)
-
-
-if __name__ == "__main__":
+def main():
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Run a P2P node.")
     parser.add_argument(
-        "--port", type=int, required=True, help="Port number to run the peer"
+        "-p",
+        "--port",
+        type=int,
+        default=3000,
+        help="The port number for the node to listen on.",
     )
     parser.add_argument(
-        "--connect", type=str, help="Address of another peer (host:port)"
+        "-H",
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="The host address for the node to bind to (default: 127.0.0.1).",
     )
     args = parser.parse_args()
 
-    if args.connect:
-        known_peers.add(args.connect)
-        try:
-            requests.post(
-                f"http://{args.connect}/peers", json={"peer": f"127.0.0.1:{args.port}"}
-            )
-        except:
-            print(f"⚠️ Could not connect to {args.connect}")
+    node = Node(args.host, args.port)
+    node.run()
 
-    app.run(host="0.0.0.0", port=args.port)
+
+if __name__ == "__main__":
+    main()
