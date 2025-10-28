@@ -94,12 +94,14 @@ class Node:
                 )
                 print(f"  - [I] Sent to {peer_host}:{peer_port}")
             except requests.exceptions.RequestException as e:
-                print(f"  - [W] Failed to send to {peer_host}:{peer_port}. Error: {e}")
+                print(
+                    f"  - [W] Failed to send message to {peer_host}:{peer_port}. Error: {e}"
+                )
                 try:
                     requests.get(url)
                 except:
                     print(
-                        f"  - [E] Failed to send to connect to {peer_host}:{peer_port}. Peer removed. Error: {e}"
+                        f"  - [E] Failed to connect to {peer_host}:{peer_port}. Peer removed. Error: {e}"
                     )
                     self.peers.remove((peer_host, peer_port))
 
@@ -109,10 +111,10 @@ class Node:
             port = int(port_str)
             url = f"http://{host}:{port}"
             try:
-                requests.get(url, headers=self.peer_header)
+                requests.get(url, headers=self.peer_header, timeout=5)
                 self.peers.add((host, port))
             except:
-                print(f"[E] Failed to send to connect to {host}:{port}.")
+                print(f"[E] Failed to connect to {host}:{port}.")
 
         print(f"[I] Starting node on http://{self.host}:{self.port}")
         self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)

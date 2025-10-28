@@ -13,25 +13,28 @@ OPTIONS=(
     "-p 3005 -P 127.0.0.1:3004"
 )
 
+tmux has-session -t "$SESSION_NAME" 2>/dev/null
+if [ $? -eq 0 ]; then 
+    tmux kill-session -t "$SESSION_NAME"
+fi
+
 tmux new-session -d -s "$SESSION_NAME" -c $(pwd)
 
-tmux split-window -h -t "$SESSION_NAME:0.0" -c "$(pwd)"
-tmux split-window -h -t "$SESSION_NAME:0.1" -c "$(pwd)"
-tmux split-window -v -t "$SESSION_NAME:0.0" -c "$(pwd)"
-tmux split-window -v -t "$SESSION_NAME:0.1" -c "$(pwd)"
-tmux split-window -v -t "$SESSION_NAME:0.2" -c "$(pwd)"
+tmux split-window -h -t "$SESSION_NAME:1.1" -c "$(pwd)"
+tmux split-window -h -t "$SESSION_NAME:1.2" -c "$(pwd)"
+tmux split-window -v -t "$SESSION_NAME:1.1" -c "$(pwd)"
+tmux split-window -v -t "$SESSION_NAME:1.2" -c "$(pwd)"
+tmux split-window -v -t "$SESSION_NAME:1.3" -c "$(pwd)"
 
-PANE_INDICES=(0 1 2 3 4 5)
-
-for i in {0..5}; do
-    PANE_INDEX=${PANE_INDICES[$i]}
-    PANE_ID="$SESSION_NAME:0.$PANE_INDEX"
-    OPTION=${OPTIONS[$i]}
+for i in {1..6}; do
+    sleep 1
+    PANE_ID="$SESSION_NAME:1.$i"
+    OPTION=${OPTIONS[$i-1]}
 
     tmux send-keys -t "$PANE_ID" "$SOURCE_COMMAND" C-m
 
     tmux send-keys -t "$PANE_ID" "uv run main.py $OPTION" C-m
 done
 
-tmux select-layout -t "$SESSION_NAME:0" tiled
+tmux select-layout -t "$SESSION_NAME:1" tiled
 
