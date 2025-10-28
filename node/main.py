@@ -6,12 +6,26 @@ class Node:
     def __init__(self, host, port):
         self.host = host
         self.port = port
+        self.peer_header = {"Peer": f"{host}:{port}"}
 
         self.peers = set()
         self.app = Flask(__name__)
         self.register_routes()
 
+    def _apply_middleware(self):
+        @self.app.before_request
+        def check_peer_header():
+            if len(self.peers) > 3 or not request.headers.get("Peer"):
+                return
+            peer_info = request.headers.get("Peer")
+            assert type(peer_info) == str
+            host, port_str = peer_info.split(":")
+            port = int(port_str)
+            self.peers.add((host, port))
+
     def register_routes(self):
+        self._apply_middleware()
+
         @self.app.route("/")
         def index():
             return f"Node running on {self.host}:{self.port}", 200
@@ -75,7 +89,9 @@ class Node:
         for peer_host, peer_port in list(self.peers):
             url = f"http://{peer_host}:{peer_port}"
             try:
-                requests.post(url + "/message", json=payload, timeout=2)
+                requests.post(
+                    url + "/message", json=payload, headers=self.peer_header, timeout=2
+                )
                 print(f"  - [I] Sent to {peer_host}:{peer_port}")
             except requests.exceptions.RequestException as e:
                 print(f"  - [W] Failed to send to {peer_host}:{peer_port}. Error: {e}")
@@ -89,10 +105,15 @@ class Node:
 
     def run(self, initial_peer: None | str = None):
         if initial_peer:
-            pos = initial_peer.find(":")
-            host = initial_peer[:pos]
-            port = int(initial_peer[pos + 1 :])
-            self.peers.add((host, port))
+            host, port_str = initial_peer.split(":")
+            port = int(port_str)
+            url = f"http://{host}:{port}"
+            try:
+                requests.get(url, headers=self.peer_header)
+                self.peers.add((host, port))
+            except:
+                print(f"[E] Failed to send to connect to {host}:{port}.")
+
         print(f"[I] Starting node on http://{self.host}:{self.port}")
         self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
 
