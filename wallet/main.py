@@ -14,10 +14,7 @@ KEY_STORAGE_PATH = "./key_store.json"
 keys: set[tuple[str, str]] = set()
 
 
-def add_new_keys(password: str):
-    pair = generate_keys()
-    keys.add(pair)
-
+def save_keys(password: str):
     data = []
     for pair in keys:
         encrypted = encrypt_data(password, json.dumps(pair))
@@ -25,13 +22,28 @@ def add_new_keys(password: str):
     save_to_file(KEY_STORAGE_PATH, data)
 
 
+def add_new_keys(password: str):
+    pair = generate_keys()
+    keys.add(pair)
+    save_keys(password)
+
+
+def delete_key(password: str, pair: tuple[str, str]):
+    keys.remove(pair)
+    save_keys(password)
+
+
 def main():
     password = prompt("Enter password: ", is_password=True)
 
     loaded_data = load_from_file(KEY_STORAGE_PATH)
-    decrypted = [decrypt_data(password, x) for x in loaded_data]
-    for key_pair in decrypted:
-        keys.add(tuple(json.loads(key_pair)))
+    try:
+        decrypted = [decrypt_data(password, x) for x in loaded_data]
+        for key_pair in decrypted:
+            keys.add(tuple(json.loads(key_pair)))
+    except:
+        print("Password is probably wrong")
+        exit(1)
 
     while True:
         radio_options = [
