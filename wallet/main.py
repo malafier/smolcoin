@@ -1,33 +1,56 @@
 import json
 
 from prompt_toolkit import prompt
+from prompt_toolkit.shortcuts import message_dialog, radiolist_dialog
 
 from src.crypto import decrypt_data, encrypt_data, generate_keys
 from src.storage import load_from_file, save_to_file
 
+### Constants
+KEY_STORAGE_PATH = "./key_store.json"
+
+
 ### Wallet State
-keys = set()
-password: str | None = None
+keys: set[tuple[str, str]] = set()
+
+
+def add_new_keys(password: str):
+    pair = generate_keys()
+    keys.add(pair)
+
+    data = []
+    for pair in keys:
+        encrypted = encrypt_data(password, json.dumps(pair))
+        data.append(encrypted)
+    save_to_file(KEY_STORAGE_PATH, data)
 
 
 def main():
     password = prompt("Enter password: ", is_password=True)
-    prv, pub = generate_keys()
-    pair = [{"private_key": prv, "public_key": pub}]
 
-    data = json.dumps(pair)
-    print(data)
-    encrypted = encrypt_data(password, data)
-    print(encrypted)
-    save_to_file("storage.json", [encrypted])
+    loaded_data = load_from_file(KEY_STORAGE_PATH)
+    decrypted = [decrypt_data(password, x) for x in loaded_data]
+    for key_pair in decrypted:
+        keys.add(tuple(json.loads(key_pair)))
 
-    ldata = load_from_file("storage.json")
-    print(ldata)
+    while True:
+        radio_options = [
+            ("add", "Generate new pair"),
+            ("list", "List all pairs"),
+            ("exit", "Exit"),
+        ]
 
-    decrypted = decrypt_data(password, ldata[0])
-    print(decrypted)
+        choice = radiolist_dialog(title="Wallet", values=radio_options).run()
 
-    print(decrypted == data)
+        if choice == "add":
+            add_new_keys(password)
+        elif choice == "list":
+            displayed_text = ""
+            for pair in keys:
+                displayed_text += f"{pair[0]}\n{pair[1]}\n\n"
+            message_dialog(title="Keys", text=displayed_text).run()
+        elif choice == "exit":
+            break
 
 
 if __name__ == "__main__":

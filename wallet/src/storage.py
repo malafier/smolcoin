@@ -1,9 +1,11 @@
 import json
-
-# import os
+import os
 
 
 def load_from_file(filepath: str) -> list:
+    if not os.path.exists(filepath):
+        save_to_file(filepath, [])
+
     with open(filepath, "r") as file:
         data = json.load(file)
         return data
