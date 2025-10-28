@@ -1,7 +1,11 @@
 import json
 
 from prompt_toolkit import prompt
-from prompt_toolkit.shortcuts import message_dialog, radiolist_dialog
+from prompt_toolkit.shortcuts import (
+    checkboxlist_dialog,
+    message_dialog,
+    radiolist_dialog,
+)
 
 from src.crypto import decrypt_data, encrypt_data, generate_keys
 from src.storage import load_from_file, save_to_file
@@ -42,13 +46,14 @@ def main():
         for key_pair in decrypted:
             keys.add(tuple(json.loads(key_pair)))
     except:
-        print("Password is probably wrong")
+        print("Failed to decrypt file.")
         exit(1)
 
     while True:
         radio_options = [
             ("add", "Generate new pair"),
             ("list", "List all pairs"),
+            ("delete", "Delete selected pairs"),
             ("exit", "Exit"),
         ]
 
@@ -61,6 +66,14 @@ def main():
             for pair in keys:
                 displayed_text += f"{pair[0]}\n{pair[1]}\n\n"
             message_dialog(title="Keys", text=displayed_text).run()
+        elif choice == "delete":
+            delete_options = [(pair, pair[1]) for pair in keys]
+            delete_choice = checkboxlist_dialog(
+                title="Delete keys", values=delete_options
+            ).run()
+
+            for pair in delete_choice:
+                delete_key(password, pair)
         elif choice == "exit":
             break
 
