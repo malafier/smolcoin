@@ -7,7 +7,7 @@ class Node:
         self.host = host
         self.port = port
 
-        self.peers = set()  # Peers are stored as (host, port) tuples
+        self.peers = set()
         self.app = Flask(__name__)
         self.register_routes()
 
@@ -87,9 +87,12 @@ class Node:
                     )
                     self.peers.remove((peer_host, peer_port))
 
-    def run(self, initial_peer=None):
+    def run(self, initial_peer: None | str = None):
         if initial_peer:
-            self.peers.add(initial_peer)
+            pos = initial_peer.find(":")
+            host = initial_peer[:pos]
+            port = int(initial_peer[pos + 1 :])
+            self.peers.add((host, port))
         print(f"[I] Starting node on http://{self.host}:{self.port}")
         self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
 
