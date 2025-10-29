@@ -1,12 +1,18 @@
 import requests
 from flask import Flask, jsonify, request
 
+from blockchain import Block
+
+genesis = Block(0, "0", 1761773051, "GENESIS")
+
 
 class Node:
     def __init__(self, host, port):
         self.host = host
         self.port = port
         self.peer_header = {"Peer": f"{host}:{port}"}
+
+        self.blockchain: list[Block] = [genesis]
 
         self.peers = set()
         self.app = Flask(__name__)
@@ -123,7 +129,7 @@ class Node:
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Run a P2P node.")
+    parser = argparse.ArgumentParser(description="Run a P2P blockchain node.")
     parser.add_argument(
         "-p",
         "--port",
