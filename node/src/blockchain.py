@@ -5,7 +5,7 @@ from cryptography.hazmat.primitives import hashes
 
 class Block:
     def __init__(self, _id: int, previous_hash: str, timestamp: int, data: str) -> None:
-        self._id: int = _id
+        self.id: int = _id
         self.previous_hash: str = previous_hash
         self.timstamp: int = timestamp
         self.data: str = data
@@ -14,7 +14,7 @@ class Block:
 
     def to_hash(self) -> str:
         data = {
-            "id": self._id,
+            "id": self.id,
             "previous_hash": self.previous_hash,
             "timestamp": self.timstamp,
             "data": self.data,
