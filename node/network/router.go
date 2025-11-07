@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	bc "node/blockchain"
 )
 
 func respondWithJSON(w http.ResponseWriter, code int, payload any) {
@@ -31,10 +33,11 @@ func respondWithError(w http.ResponseWriter, code int, message string) {
 
 type Server struct {
 	State *NodeState
+	Miner *bc.Miner
 }
 
 func NewServer(state *NodeState, initialPeer string) *Server {
-	server := &Server{State: state}
+	server := &Server{State: state, Miner: bc.NewMiner()}
 	server.connectToInitialPeer(initialPeer)
 	return server
 }

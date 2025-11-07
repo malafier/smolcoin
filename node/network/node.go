@@ -15,7 +15,7 @@ type Peer struct {
 	Port int    `json:"port"`
 }
 
-func (p Peer) Addr() string {
+func (p *Peer) Addr() string {
 	return fmt.Sprintf("%s:%d", p.Host, p.Port)
 }
 
