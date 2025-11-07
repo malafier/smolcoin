@@ -2,8 +2,6 @@
 
 SESSION_NAME="p2p"
 
-SOURCE="source .venv/bin/activate"
-
 OPTIONS=(
     "-p 3000"
     "-p 3001 -P 127.0.0.1:3000"
@@ -31,9 +29,7 @@ for i in {1..6}; do
     PANE_ID="$SESSION_NAME:1.$i"
     OPTION=${OPTIONS[$i-1]}
 
-    tmux send-keys -t "$PANE_ID" "$SOURCE_COMMAND" C-m
-
-    tmux send-keys -t "$PANE_ID" "uv run main.py $OPTION" C-m
+    tmux send-keys -t "$PANE_ID" "go run ./main.go $OPTION" C-m
 done
 
 tmux select-layout -t "$SESSION_NAME:1" tiled
