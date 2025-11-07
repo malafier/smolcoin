@@ -19,18 +19,17 @@ func (p Peer) Addr() string {
 	return fmt.Sprintf("%s:%d", p.Host, p.Port)
 }
 
-type Node struct {
+type NodeState struct {
 	Host       string
 	Port       int
 	PeerHeader http.Header
 	Blockchain []bc.Block
 	Peers      map[string]Peer
 	PeersLock  sync.RWMutex
-	HttpClient *http.Client
 }
 
-func NewNode(host string, port int) *Node {
-	node := &Node{
+func NewNodeState(host string, port int) *NodeState {
+	node := &NodeState{
 		Host:       host,
 		Port:       port,
 		Blockchain: []bc.Block{bc.Genesis},
@@ -41,11 +40,11 @@ func NewNode(host string, port int) *Node {
 	return node
 }
 
-func (n *Node) Addr() string {
+func (n *NodeState) Addr() string {
 	return fmt.Sprintf("%s:%d", n.Host, n.Port)
 }
 
-func (n *Node) AddPeer(host string, port int) error {
+func (n *NodeState) AddPeer(host string, port int) error {
 	newPeer := Peer{Host: host, Port: port}
 	addr := newPeer.Addr()
 
@@ -61,13 +60,13 @@ func (n *Node) AddPeer(host string, port int) error {
 	return nil
 }
 
-func (n *Node) RemovePeer(peer Peer) {
+func (n *NodeState) RemovePeer(peer Peer) {
 	n.PeersLock.Lock()
 	defer n.PeersLock.Unlock()
 	delete(n.Peers, peer.Addr())
 }
 
-func (n *Node) PeersList() []Peer {
+func (n *NodeState) PeersList() []Peer {
 	n.PeersLock.RLock()
 	defer n.PeersLock.RUnlock()
 
@@ -79,7 +78,7 @@ func (n *Node) PeersList() []Peer {
 	return peerList
 }
 
-func (n *Node) PeerCount() int {
+func (n *NodeState) PeerCount() int {
 	n.PeersLock.RLock()
 	defer n.PeersLock.RUnlock()
 	return len(n.Peers)

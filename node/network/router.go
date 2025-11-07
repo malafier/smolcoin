@@ -29,11 +29,21 @@ func respondWithError(w http.ResponseWriter, code int, message string) {
 	respondWithJSON(w, code, map[string]string{"error": message})
 }
 
-func checkPeerHeader(next http.Handler, node *Node) http.Handler {
+type Server struct {
+	State *NodeState
+}
+
+func NewServer(state *NodeState, initialPeer string) *Server {
+	server := &Server{State: state}
+	server.connectToInitialPeer(initialPeer)
+	return server
+}
+
+func (s *Server) checkPeerHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peerInfo := r.Header.Get("Peer")
 
-		if node.PeerCount() > 3 || peerInfo == "" {
+		if s.State.PeerCount() > 3 || peerInfo == "" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -49,18 +59,18 @@ func checkPeerHeader(next http.Handler, node *Node) http.Handler {
 			return
 		}
 
-		node.AddPeer(host, port)
+		s.State.AddPeer(host, port)
 
 		next.ServeHTTP(w, r)
 	})
 }
 
-func index(w http.ResponseWriter, r *http.Request, node *Node) {
+func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Node running on %s", node.Addr())
+	fmt.Fprintf(w, "Node running on %s", s.State.Addr())
 }
 
-func addPeer(w http.ResponseWriter, r *http.Request, node *Node) {
+func (s *Server) addPeer(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		Host string `json:"host"`
 		Port int    `json:"port"`
@@ -72,7 +82,7 @@ func addPeer(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	defer r.Body.Close()
 
-	if err := node.AddPeer(req.Host, req.Port); err != nil {
+	if err := s.State.AddPeer(req.Host, req.Port); err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -82,8 +92,8 @@ func addPeer(w http.ResponseWriter, r *http.Request, node *Node) {
 	})
 }
 
-func getPeers(w http.ResponseWriter, r *http.Request, node *Node) {
-	respondWithJSON(w, http.StatusOK, map[string]interface{}{"peers": node.PeersList()})
+func (s *Server) getPeers(w http.ResponseWriter, r *http.Request) {
+	respondWithJSON(w, http.StatusOK, map[string]interface{}{"peers": s.State.PeersList()})
 }
 
 type MessageRequest struct {
@@ -91,7 +101,7 @@ type MessageRequest struct {
 	Sender  string `json:"sender"`
 }
 
-func receiveMessage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) receiveMessage(w http.ResponseWriter, r *http.Request) {
 	var req MessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid data. 'message' is required.")
@@ -107,7 +117,7 @@ func receiveMessage(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Message received."})
 }
 
-func broadcastMessageRoute(w http.ResponseWriter, r *http.Request, node *Node) {
+func (s *Server) broadcastMessageRoute(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		Message string `json:"message"`
 	}{}
@@ -118,18 +128,18 @@ func broadcastMessageRoute(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	defer r.Body.Close()
 
-	go broadcastMessage(req.Message, node)
+	go s.broadcastMessage(req.Message)
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Broadcasted succesfully"})
 }
 
-func broadcastMessage(message string, node *Node) {
-	peerList := node.PeersList()
+func (s *Server) broadcastMessage(message string) {
+	peerList := s.State.PeersList()
 	log.Printf("Broadcasting message to %d peer(s)...\n", len(peerList))
 
 	payload := MessageRequest{
 		Message: message,
-		Sender:  node.Addr(),
+		Sender:  s.State.Addr(),
 	}
 
 	payloadBytes, err := json.Marshal(payload)
@@ -143,14 +153,14 @@ func broadcastMessage(message string, node *Node) {
 		wg.Add(1)
 		go func(p Peer) {
 			defer wg.Done()
-			sendMessageToPeer(p, payloadBytes, node)
+			s.sendMessageToPeer(p, payloadBytes)
 		}(peer)
 	}
 	wg.Wait()
 	log.Println("Broadcast finished.")
 }
 
-func sendMessageToPeer(peer Peer, payload []byte, node *Node) {
+func (s *Server) sendMessageToPeer(peer Peer, payload []byte) {
 	url := fmt.Sprintf("http://%s/message", peer.Addr())
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
@@ -160,7 +170,7 @@ func sendMessageToPeer(peer Peer, payload []byte, node *Node) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Peer", node.Addr())
+	req.Header.Set("Peer", s.State.Addr())
 
 	client := http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
@@ -168,7 +178,7 @@ func sendMessageToPeer(peer Peer, payload []byte, node *Node) {
 		log.Printf("  - [W] Failed to send message to %s. Error: %v\n", peer.Addr(), err)
 		if checkPeerDead(peer) {
 			log.Printf("  - [E] Failed to connect to %s. Peer removed.\n", peer.Addr())
-			node.RemovePeer(peer)
+			s.State.RemovePeer(peer)
 		}
 		return
 	}
@@ -183,7 +193,7 @@ func checkPeerDead(peer Peer) bool {
 	return err != nil
 }
 
-func ConnectToInitialPeer(initialPeer string, node *Node) {
+func (s *Server) connectToInitialPeer(initialPeer string) {
 	if initialPeer == "" {
 		return
 	}
@@ -200,29 +210,29 @@ func ConnectToInitialPeer(initialPeer string, node *Node) {
 
 	url := fmt.Sprintf("http://%s:%d/", host, port)
 	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Peer", node.Addr())
+	req.Header.Set("Peer", s.State.Addr())
 	client := http.Client{Timeout: 5 * time.Second}
 	if _, err := client.Do(req); err == nil {
-		node.AddPeer(host, port)
+		s.State.AddPeer(host, port)
 		log.Printf("[I] Successfully connected to initial peer %s\n", initialPeer)
 	} else {
 		log.Printf("[E] Failed to connect to %s. Error: %v\n", initialPeer, err)
 	}
 }
 
-func StartServer(node *Node) {
+func (s *Server) StartServer() {
 	router := http.NewServeMux()
 
-	router.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) { index(w, r, node) })
-	router.HandleFunc("POST /peer", func(w http.ResponseWriter, r *http.Request) { addPeer(w, r, node) })
-	router.HandleFunc("GET /peers", func(w http.ResponseWriter, r *http.Request) { getPeers(w, r, node) })
-	router.HandleFunc("POST /message", receiveMessage)
-	router.HandleFunc("POST /broadcast", func(w http.ResponseWriter, r *http.Request) { broadcastMessageRoute(w, r, node) })
+	router.HandleFunc("GET /", s.index)
+	router.HandleFunc("POST /peer", s.addPeer)
+	router.HandleFunc("GET /peers", s.getPeers)
+	router.HandleFunc("POST /message", s.receiveMessage)
+	router.HandleFunc("POST /broadcast", s.broadcastMessageRoute)
 
-	handlerWithMiddleware := checkPeerHeader(router, node)
+	handlerWithMiddleware := s.checkPeerHeader(router)
 
-	serverAddr := node.Addr()
-	log.Printf("[I] Starting node on http://%s\n", serverAddr)
+	serverAddr := s.State.Addr()
+	log.Printf("[I] Starting s.State on http://%s\n", serverAddr)
 	if err := http.ListenAndServe(serverAddr, handlerWithMiddleware); err != nil {
 		log.Fatalf("[F] Failed to start server: %v\n", err)
 	}

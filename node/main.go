@@ -12,7 +12,6 @@ func main() {
 	peer := flag.String("P", "", "Address to connect to peer (e.g., 127.0.0.1:3001)")
 	flag.Parse()
 
-	node := NewNode(*host, *port)
-	ConnectToInitialPeer(*peer, node)
-	StartServer(node)
+	server := NewServer(NewNodeState(*host, *port), *peer)
+	server.StartServer()
 }
