@@ -19,8 +19,12 @@ type Server struct {
 	Miner *bc.Miner
 }
 
-func NewServer(state *NodeState, initialPeer string) *Server {
-	server := &Server{State: state, Miner: bc.NewMiner()}
+func NewServer(state *NodeState, initialPeer string, ifMiner bool) *Server {
+	var miner *bc.Miner
+	if ifMiner {
+		miner = bc.NewMiner()
+	}
+	server := &Server{State: state, Miner: miner}
 	server.connectToInitialPeer(initialPeer)
 	return server
 }
@@ -51,12 +55,12 @@ func (s *Server) checkPeerHeader(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) index(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Node running on %s", s.State.Addr())
 }
 
-func (s *Server) addPeer(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAddPeer(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		Host string `json:"host"`
 		Port int    `json:"port"`
@@ -78,7 +82,7 @@ func (s *Server) addPeer(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) getPeers(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetPeers(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{"peers": s.State.PeersList()})
 }
 
@@ -87,7 +91,7 @@ type MessageRequest struct {
 	Sender  string `json:"sender"`
 }
 
-func (s *Server) receiveMessage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReceiveMessage(w http.ResponseWriter, r *http.Request) {
 	var req MessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid data. 'message' is required.")
@@ -103,7 +107,7 @@ func (s *Server) receiveMessage(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Message received."})
 }
 
-func (s *Server) broadcastMessageRoute(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleBroadcastMessage(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		Message string `json:"message"`
 	}{}
@@ -203,11 +207,11 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 func (s *Server) StartServer() {
 	router := http.NewServeMux()
 
-	router.HandleFunc("GET /", s.index)
-	router.HandleFunc("POST /peer", s.addPeer)
-	router.HandleFunc("GET /peers", s.getPeers)
-	router.HandleFunc("POST /message", s.receiveMessage)
-	router.HandleFunc("POST /broadcast", s.broadcastMessageRoute)
+	router.HandleFunc("GET /", s.handleIndex)
+	router.HandleFunc("POST /peer", s.handleAddPeer)
+	router.HandleFunc("GET /peers", s.handleGetPeers)
+	router.HandleFunc("POST /message", s.handleReceiveMessage)
+	router.HandleFunc("POST /broadcast", s.handleBroadcastMessage)
 
 	handlerWithMiddleware := s.checkPeerHeader(router)
 
