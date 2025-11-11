@@ -5,7 +5,8 @@ type Block struct {
 	PrevHash  string `json:"prev_hash"`
 	Timestamp int64  `json:"timestamp"`
 	Data      string `json:"data"`
-	Hash      string `json:"hash"`
+	Hash      string `json:"hash,omitempty"`
+	Nonce     int    `json:"nonce"`
 }
 
 var Genesis = Block{
