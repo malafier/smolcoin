@@ -24,10 +24,14 @@ func NewMiner() *Miner {
 	}
 }
 
-func (m *Miner) AddTransaction(transaction *Transaction) {
+func (m *Miner) AddTransaction(transaction *Transaction) bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	if slices.Contains(m.mempool, transaction) {
+		return false
+	}
 	m.mempool = append(m.mempool, transaction)
+	return true
 }
 
 func (m *Miner) StopMining() {
