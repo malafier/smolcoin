@@ -32,7 +32,6 @@ func NewServer(state *NodeState, initialPeer string, ifMiner bool) *Server {
 func (s *Server) checkPeerHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peerInfo := r.Header.Get("Peer")
-
 		if s.State.PeerCount() > 3 || peerInfo == "" {
 			next.ServeHTTP(w, r)
 			return
@@ -136,15 +135,18 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	added := s.Miner.AddTransaction(req.Transaction)
-	if !added {
-		respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Transaction already recived."})
-		return
+	if s.Miner != nil {
+		added := s.Miner.AddTransaction(req.Transaction)
+		if !added {
+			respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Transaction already recived."})
+			return
+		}
 	}
 
 	message, err := json.Marshal(req)
 	if err != nil {
 		log.Print("Failed to marshal reqest for broadcast for some reason")
+		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
 		return
 	}
 
@@ -154,7 +156,43 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
+	var req *bc.Block
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid data.")
+		return
+	}
+	defer r.Body.Close()
 
+	if !req.IsValid() {
+		respondWithError(w, http.StatusBadRequest, "Invalid block hash")
+		return
+	}
+
+	err := s.State.AddBlock(req)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Block declined: %s.", err.Error()))
+		return
+	}
+
+	data := req.Data
+	if s.Miner != nil {
+		s.Miner.StopMining()
+		s.Miner.DeleteTransactions(data)
+
+		s.State.ChainLock.Lock()
+		go s.Miner.Mine(req, bc.DEFAULT_DIFFICULTY)
+	}
+
+	message, err := json.Marshal(req)
+	if err != nil {
+		log.Print("Failed to marshal reqest for broadcast for some reason")
+		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
+		return
+	}
+
+	go s.broadcastMessage("block", string(message))
+
+	respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Block added to chain"})
 }
 
 func (s *Server) broadcastMessage(uri, message string) {

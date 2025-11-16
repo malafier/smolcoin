@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const DEFAULT_DIFFICULTY int = 5
+
 type Miner struct {
 	mempool      []*Transaction
 	isMining     bool
@@ -32,6 +34,10 @@ func (m *Miner) AddTransaction(transaction *Transaction) bool {
 	}
 	m.mempool = append(m.mempool, transaction)
 	return true
+}
+
+func (m *Miner) DeleteTransactions(data string) {
+	// TODO
 }
 
 func (m *Miner) StopMining() {

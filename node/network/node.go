@@ -23,9 +23,14 @@ type NodeState struct {
 	Host       string
 	Port       int
 	PeerHeader http.Header
+
+	// Blockchain
 	Blockchain []bc.Block
-	Peers      map[string]Peer
-	PeersLock  sync.RWMutex
+	ChainLock  sync.Mutex
+
+	// Peers
+	Peers     map[string]Peer
+	PeersLock sync.RWMutex
 }
 
 func NewNodeState(host string, port int) *NodeState {
@@ -82,5 +87,20 @@ func (n *NodeState) PeerCount() int {
 	n.PeersLock.RLock()
 	defer n.PeersLock.RUnlock()
 	return len(n.Peers)
+}
 
+func (n *NodeState) AddBlock(block *bc.Block) error {
+	n.ChainLock.Lock()
+	defer n.ChainLock.Unlock()
+
+	lastBlock := n.Blockchain[len(n.Blockchain)-1]
+	if lastBlock.Index+1 != block.Index {
+		return errors.New("Indexes mismatch")
+	}
+	if lastBlock.Hash != block.PrevHash {
+		return errors.New("Hash mismatch")
+	}
+
+	n.Blockchain = append(n.Blockchain, *block)
+	return nil
 }
