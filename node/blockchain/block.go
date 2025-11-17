@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"structs"
 )
 
 type Block struct {
@@ -20,16 +19,7 @@ func (b *Block) IsValid() bool {
 	if b.Hash != "" {
 		return false
 	}
-
-	blockToHash := struct {
-		Index     int    `json:"index"`
-		PrevHash  string `json:"prev_hash"`
-		Timestamp int64  `json:"timestamp"`
-		Data      string `json:"data"`
-		Nonce     int    `json:"nonce"`
-	}{}
-
-	blockJson, err := json.Marshal(blockToHash)
+	blockJson, err := b.SerializeWithoutHash()
 	if err != nil {
 		log.Printf("Failed to mashal a block.")
 		return false
@@ -59,16 +49,10 @@ func (b *Block) SerializeWithoutHash() ([]byte, error) {
 }
 
 func (b *Block) CreateHash() (string, error) {
-	block := b
-	if block.Hash != "" {
-		block.Hash = ""
-	}
-
-	blockJson, err := json.Marshal(block)
+	blockJson, err := b.SerializeWithoutHash()
 	if err != nil {
 		return "", errors.New("Failed to mashal a block.")
 	}
-
 	return hash(blockJson), nil
 }
 

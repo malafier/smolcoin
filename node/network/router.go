@@ -151,6 +151,9 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go s.broadcastMessage("transaction", string(message))
+	if s.Miner != nil && !s.Miner.IsMining {
+		go s.Miner.Mine(bc.DEFAULT_DIFFICULTY)
+	}
 
 	respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Transaction accepted and broadcasted"})
 }
@@ -180,10 +183,11 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		s.Miner.DeleteTransactions(data)
 
 		s.State.ChainLock.Lock()
-		go s.Miner.Mine(req, bc.DEFAULT_DIFFICULTY)
+		s.Miner.PrevBlock = req
+		go s.Miner.Mine(bc.DEFAULT_DIFFICULTY)
 	}
 
-	message, err := json.Marshal(req)
+	message, err := req.SerializeWithoutHash()
 	if err != nil {
 		log.Print("Failed to marshal reqest for broadcast for some reason")
 		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")

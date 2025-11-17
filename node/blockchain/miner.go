@@ -13,38 +13,51 @@ import (
 const DEFAULT_DIFFICULTY int = 5
 
 type Miner struct {
-	mempool      []*Transaction
-	isMining     bool
+	Mempool      []*Transaction
+	IsMining     bool
+	PrevBlock    *Block
 	cancelMining context.CancelFunc
 	mutex        sync.Mutex
 }
 
 func NewMiner() *Miner {
 	return &Miner{
-		mempool:  []*Transaction{},
-		isMining: false,
+		Mempool:   []*Transaction{},
+		PrevBlock: &Genesis,
+		IsMining:  false,
 	}
 }
 
 func (m *Miner) AddTransaction(transaction *Transaction) bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if slices.Contains(m.mempool, transaction) {
+	if slices.Contains(m.Mempool, transaction) {
 		return false
 	}
-	m.mempool = append(m.mempool, transaction)
+	m.Mempool = append(m.Mempool, transaction)
 	return true
 }
 
 func (m *Miner) DeleteTransactions(data string) {
-	// TODO
+	// transactions, err = json.Marshal(data)
+	// if err != nil {
+	// 	log.Print("[W] Failed to marshal transactions.")
+	// }
+	//
+	// for _, trans := range transactions {
+	// 	for i, memEl := range m.Mempool {
+	// 		if trans == memEl {
+	// 			m.Mempool = slices.Delete(m.Mempool, i, i)
+	// 		}
+	// 	}
+	// }
 }
 
 func (m *Miner) StopMining() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if m.isMining {
-		m.isMining = false
+	if m.IsMining {
+		m.IsMining = false
 		m.cancelMining()
 	}
 }
@@ -52,26 +65,26 @@ func (m *Miner) StopMining() {
 func (m *Miner) GetDifficulty() (int, bool) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if len(m.mempool) == 0 {
+	if len(m.Mempool) == 0 {
 		return 0, false
 	}
-	return m.mempool[len(m.mempool)-1].Difficulty, true
+	return m.Mempool[len(m.Mempool)-1].Difficulty, true
 }
 
-func (m *Miner) Mine(prevBlock *Block, difficulty int) *Block {
+func (m *Miner) Mine(difficulty int) *Block {
 	m.mutex.Lock()
-	if len(m.mempool) == 0 {
-		m.isMining = false
+	if len(m.Mempool) == 0 {
+		m.IsMining = false
 		log.Printf("Nothing to mine.")
 		m.mutex.Unlock()
 		return nil
 	}
 
 	var transactions []*Transaction
-	for i, t := range m.mempool {
+	for i, t := range m.Mempool {
 		if t.Difficulty == difficulty {
 			transactions = append(transactions, t)
-			m.mempool = slices.Delete(m.mempool, i, i)
+			m.Mempool = slices.Delete(m.Mempool, i, i)
 		}
 	}
 	defer m.mutex.Unlock()
@@ -79,12 +92,10 @@ func (m *Miner) Mine(prevBlock *Block, difficulty int) *Block {
 	var ctx context.Context
 	ctx, m.cancelMining = context.WithCancel(context.Background())
 
-	block := miningLoop(ctx, transactions, difficulty, prevBlock)
+	block := miningLoop(ctx, transactions, difficulty, m.PrevBlock)
 
-	// m.mutex.Lock()
-	// defer m.mutex.Unlock()
 	if block == nil {
-		m.mempool = append(m.mempool, transactions...)
+		m.Mempool = append(m.Mempool, transactions...)
 	}
 	return block
 }
@@ -93,7 +104,7 @@ func miningLoop(ctx context.Context, transactions []*Transaction, difficulty int
 	prefix := strings.Repeat("0", difficulty)
 	blockData, err := json.Marshal(transactions)
 	if err != nil {
-		log.Printf("Failed to mashal transactions.")
+		log.Printf("Failed to marshal transactions.")
 	}
 
 	block := &Block{
@@ -111,9 +122,9 @@ func miningLoop(ctx context.Context, transactions []*Transaction, difficulty int
 		default:
 		}
 
-		blockJson, err := json.Marshal(block)
+		blockJson, err := block.SerializeWithoutHash()
 		if err != nil {
-			log.Printf("Failed to mashal a block.")
+			log.Printf("Failed to marshal a block.")
 		}
 
 		blockHash := hash(blockJson)
