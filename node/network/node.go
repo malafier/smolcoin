@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 
 	bc "node/blockchain"
@@ -24,6 +25,7 @@ type NodeState struct {
 	Host       string
 	Port       int
 	PeerHeader http.Header
+	Difficulty int
 
 	// Blockchain
 	Blockchain []bc.Block
@@ -102,7 +104,11 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	if lastBlock.Hash != block.PrevHash {
 		return errors.New("Hash mismatch")
 	}
-	// TODO: sprawdzić ilość 0
+
+	prefix := strings.Repeat("0", ns.Difficulty)
+	if strings.HasPrefix(block.Hash, prefix) {
+		return errors.New("Prefix not long enough")
+	}
 
 	ns.Blockchain = append(ns.Blockchain, *block)
 	return nil

@@ -138,8 +138,7 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := s.State.AddBlock(req)
-	if err != nil {
+	if err := s.State.AddBlock(req); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Block declined: %s.", err.Error()))
 		return
 	}
