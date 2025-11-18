@@ -4,45 +4,35 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
 )
 
-type Transaction struct {
-	Sender     string  `json:"sender"`
-	Reciever   string  `json:"reciever"`
-	Ammount    float32 `json:"ammount"`
-	Timestamp  int     `json:"timestamp"`
-	Difficulty int     `json:"difficulty"`
-}
+// type Transaction struct {
+// 	Sender     string  `json:"sender"`
+// 	Reciever   string  `json:"reciever"`
+// 	Ammount    float32 `json:"ammount"`
+// 	Timestamp  int     `json:"timestamp"`
+// 	Difficulty int     `json:"difficulty"`
+// }
 
 type TransactionMessage struct {
-	Transaction *Transaction `json:"transaction"`
-	Hash        string       `json:"hash"`
-	PublicKey   string       `json:"sender_pk"`
-	R           *big.Int     `json:"r"`
-	S           *big.Int     `json:"s"`
+	Transaction string `json:"transaction"`
+	Signature   string `json:"signature"`
+	PublicKey   string `json:"sender_pk"`
 }
 
 func (tm *TransactionMessage) TransactionIsValid() bool {
-	data, err := json.Marshal(tm.Transaction)
-	if err != nil {
-		log.Printf("Failed to mashal transactions.")
-		return false
-	}
-	hashedData := sha256.Sum256(data)
-
 	publicKey, err := pemToPublicKey(tm.PublicKey)
 	if err != nil {
 		log.Fatal(err)
 		return false
 	}
 
-	return ecdsa.Verify(publicKey, hashedData[:], tm.R, tm.S)
+	hashedData := sha256.Sum256([]byte(tm.Transaction))
+	return ecdsa.VerifyASN1(publicKey, hashedData[:], []byte(tm.Signature))
 
 }
 

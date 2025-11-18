@@ -13,7 +13,7 @@ import (
 const DEFAULT_DIFFICULTY int = 5
 
 type Miner struct {
-	Mempool      []*Transaction
+	Mempool      []*string
 	IsMining     bool
 	PrevBlock    *Block
 	cancelMining context.CancelFunc
@@ -22,13 +22,13 @@ type Miner struct {
 
 func NewMiner() *Miner {
 	return &Miner{
-		Mempool:   []*Transaction{},
+		Mempool:   []*string{},
 		PrevBlock: &Genesis,
 		IsMining:  false,
 	}
 }
 
-func (m *Miner) AddTransaction(transaction *Transaction) bool {
+func (m *Miner) AddTransaction(transaction *string) bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if slices.Contains(m.Mempool, transaction) {
@@ -38,20 +38,20 @@ func (m *Miner) AddTransaction(transaction *Transaction) bool {
 	return true
 }
 
-func (m *Miner) DeleteTransactions(data string) {
-	// transactions, err = json.Marshal(data)
-	// if err != nil {
-	// 	log.Print("[W] Failed to marshal transactions.")
-	// }
-	//
-	// for _, trans := range transactions {
-	// 	for i, memEl := range m.Mempool {
-	// 		if trans == memEl {
-	// 			m.Mempool = slices.Delete(m.Mempool, i, i)
-	// 		}
-	// 	}
-	// }
-}
+// func (m *Miner) DeleteTransactions(data string) {
+// 	transactions, err = json.Marshal(data)
+// 	if err != nil {
+// 		log.Print("[W] Failed to marshal transactions.")
+// 	}
+//
+// 	for _, trans := range transactions {
+// 		for i, memEl := range m.Mempool {
+// 			if trans == memEl {
+// 				m.Mempool = slices.Delete(m.Mempool, i, i)
+// 			}
+// 		}
+// 	}
+// }
 
 func (m *Miner) StopMining() {
 	m.mutex.Lock()
@@ -62,14 +62,14 @@ func (m *Miner) StopMining() {
 	}
 }
 
-func (m *Miner) GetDifficulty() (int, bool) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	if len(m.Mempool) == 0 {
-		return 0, false
-	}
-	return m.Mempool[len(m.Mempool)-1].Difficulty, true
-}
+// func (m *Miner) GetDifficulty() (int, bool) {
+// 	m.mutex.Lock()
+// 	defer m.mutex.Unlock()
+// 	if len(m.Mempool) == 0 {
+// 		return 0, false
+// 	}
+// 	return m.Mempool[len(m.Mempool)-1].Difficulty, true
+// }
 
 func (m *Miner) Mine(difficulty int) *Block {
 	m.mutex.Lock()
