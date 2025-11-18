@@ -7,11 +7,11 @@ import (
 )
 
 type Block struct {
+	Nonce     int    `json:"nonce"`
 	Index     int    `json:"index"`
 	PrevHash  string `json:"prev_hash"`
 	Timestamp int64  `json:"timestamp"`
 	Data      string `json:"data"`
-	Nonce     int    `json:"nonce"`
 	Hash      string `json:"hash,omitempty"`
 }
 
@@ -61,4 +61,5 @@ var Genesis = Block{
 	PrevHash:  "0",
 	Timestamp: 1761773051,
 	Data:      "GENESIS",
+	Hash:      "a80c2a115782e2699002fc1104a53507014b0694dd706e2ab1c4172c3ce6d234",
 }
