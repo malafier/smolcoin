@@ -41,7 +41,6 @@ func (tm *TransactionMessage) TransactionIsValid() bool {
 
 	hashedData := sha256.Sum256([]byte(tm.Transaction))
 	return ecdsa.VerifyASN1(publicKey, hashedData[:], signature)
-
 }
 
 func pemToPublicKey(pemKey string) (*ecdsa.PublicKey, error) {
