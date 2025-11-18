@@ -31,7 +31,7 @@ def generate_keys() -> tuple[str, str]:
     return prv_pem, pub_pem
 
 
-def derive_key(password: bytes, salt: bytes) -> bytes:
+def _derive_key(password: bytes, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(), length=DKEY_LEN, iterations=PBKDF2_ITERS, salt=salt
     )
@@ -42,7 +42,7 @@ def encrypt_data(password: str, data: str) -> dict:
     data_bytes = data.encode("utf-8")
     salt = os.urandom(SALT_LEN)
 
-    key = derive_key(password.encode("utf-8"), salt)
+    key = _derive_key(password.encode("utf-8"), salt)
     iv = os.urandom(IV_LEN)
 
     aes = algorithms.AES256(key)
@@ -61,7 +61,7 @@ def encrypt_data(password: str, data: str) -> dict:
 
 
 def decrypt_data(password: str, encoded_data: dict) -> str:
-    key = derive_key(password.encode("utf-8"), base64.b64decode(encoded_data["salt"]))
+    key = _derive_key(password.encode("utf-8"), base64.b64decode(encoded_data["salt"]))
     aes = algorithms.AES256(key)
     cipher = Cipher(aes, modes.CBC(base64.b64decode(encoded_data["iv"])))
     decryptor = cipher.decryptor()
