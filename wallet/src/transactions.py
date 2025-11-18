@@ -12,15 +12,8 @@ class Transaction:
 
 @dataclass
 class TransactionMessage:
-    transaction: Transaction
+    transaction: str
     hash: str
     sender_pk: str
-    r: int
-    s: int
-
-
-transaction_fields = [
-    {"label": "Sender", "name": "sender"},
-    {"label": "Reciever", "name": "reciever"},
-    {"label": "Ammount", "name": "ammount"},
-]
+    # r: int
+    # s: int

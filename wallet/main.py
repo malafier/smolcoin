@@ -9,10 +9,10 @@ from prompt_toolkit.shortcuts import (
     radiolist_dialog,
 )
 
-from src.crypto import decrypt_data, encrypt_data, generate_keys
-from src.network import send_message
+from src.crypto import decrypt_data, encrypt_data, generate_keys, sign_message
+from src.network import send_message, send_transaction
 from src.storage import load_from_file, save_to_file
-from src.transactions import transaction_fields
+from src.transactions import TransactionMessage
 
 ### Constants
 KEY_STORAGE_PATH = "./key_store.json"
@@ -56,6 +56,7 @@ def main():
         exit(1)
 
     while True:
+        key_options = [(pair, pair[1]) for pair in keys]
         radio_options = [
             ("add", "Generate new pair"),
             ("list", "List all pairs"),
@@ -78,7 +79,6 @@ def main():
             message_dialog(title="Keys", text=displayed_text).run()
 
         elif choice == "delete":
-            key_options = [(pair, pair[1]) for pair in keys]
             delete_choice = checkboxlist_dialog(
                 title="Delete keys", values=key_options
             ).run()
@@ -98,7 +98,15 @@ def main():
             if not node_adr:
                 message_dialog(title="Error", text="Node address is not set.").run()
                 continue
-            results = input_dialog("New transaction").run()
+            message = input_dialog(text="Message to send to block").run()
+            if not message:
+                continue
+            key_choice = radiolist_dialog(title="Delete keys", values=key_options).run()
+            signed_message = sign_message(key_choice[0], message).decode("utf-8")
+            send_transaction(
+                node_adr,
+                TransactionMessage(message, signed_message, key_choice[0]),
+            )
 
         elif choice == "exit":
             break

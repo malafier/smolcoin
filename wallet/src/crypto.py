@@ -71,3 +71,17 @@ def decrypt_data(password: str, encoded_data: dict) -> str:
     unpadder = padding.PKCS7(aes.block_size).unpadder()
     plain_text = unpadder.update(padded_data) + unpadder.finalize()
     return plain_text.decode("utf-8")
+
+
+def sign_message(private_key_pem: str, message: str) -> bytes:
+    private_key = serialization.load_pem_private_key(
+        private_key_pem.encode("utf-8"),
+        password=None,
+    )
+    assert isinstance(private_key, ec.EllipticCurvePrivateKey)
+
+    message_bytes = message.encode("utf-8")
+
+    # ECDSA (Elliptic Curve Digital Signature Algorithm)
+    # with SHA-256 as the hash function.
+    return private_key.sign(message_bytes, ec.ECDSA(hashes.SHA256()))
