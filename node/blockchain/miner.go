@@ -13,7 +13,7 @@ import (
 const DEFAULT_DIFFICULTY int = 5
 
 type Miner struct {
-	Mempool      []*string
+	Mempool      []string
 	IsMining     bool
 	PrevBlock    *Block
 	cancelMining context.CancelFunc
@@ -22,13 +22,13 @@ type Miner struct {
 
 func NewMiner() *Miner {
 	return &Miner{
-		Mempool:   []*string{},
+		Mempool:   []string{},
 		PrevBlock: &Genesis,
 		IsMining:  false,
 	}
 }
 
-func (m *Miner) AddTransaction(transaction *string) bool {
+func (m *Miner) AddTransaction(transaction string) bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if slices.Contains(m.Mempool, transaction) {
@@ -73,34 +73,22 @@ func (m *Miner) StopMining() {
 
 func (m *Miner) Mine(difficulty int) *Block {
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	if len(m.Mempool) == 0 {
 		m.IsMining = false
 		log.Printf("Nothing to mine.")
-		m.mutex.Unlock()
 		return nil
 	}
-
-	var transactions []*Transaction
-	for i, t := range m.Mempool {
-		if t.Difficulty == difficulty {
-			transactions = append(transactions, t)
-			m.Mempool = slices.Delete(m.Mempool, i, i)
-		}
-	}
-	defer m.mutex.Unlock()
 
 	var ctx context.Context
 	ctx, m.cancelMining = context.WithCancel(context.Background())
 
-	block := miningLoop(ctx, transactions, difficulty, m.PrevBlock)
+	block := miningLoop(ctx, m.Mempool, difficulty, m.PrevBlock)
 
-	if block == nil {
-		m.Mempool = append(m.Mempool, transactions...)
-	}
 	return block
 }
 
-func miningLoop(ctx context.Context, transactions []*Transaction, difficulty int, prevBlock *Block) *Block {
+func miningLoop(ctx context.Context, transactions []string, difficulty int, prevBlock *Block) *Block {
 	prefix := strings.Repeat("0", difficulty)
 	blockData, err := json.Marshal(transactions)
 	if err != nil {

@@ -1,6 +1,7 @@
+import base64
 import json
-from dataclasses import fields
 
+import requests
 from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import (
     checkboxlist_dialog,
@@ -10,7 +11,7 @@ from prompt_toolkit.shortcuts import (
 )
 
 from src.crypto import decrypt_data, encrypt_data, generate_keys, sign_message
-from src.network import send_message, send_transaction
+from src.network import send_transaction
 from src.storage import load_from_file, save_to_file
 from src.transactions import TransactionMessage
 
@@ -20,7 +21,7 @@ KEY_STORAGE_PATH = "./key_store.json"
 
 ### Wallet State
 keys: set[tuple[str, str]] = set()
-node_adr: str | None = None
+node_adr: str | None = "localhost:3001"
 
 
 def save_keys(password: str):
@@ -62,7 +63,6 @@ def main():
             ("list", "List all pairs"),
             ("delete", "Delete selected pairs"),
             ("connect", "Connect to node"),
-            ("broadcast", "Brodcast message"),
             ("transaction", "Send transaction"),
             ("exit", "Exit"),
         ]
@@ -87,25 +87,25 @@ def main():
 
         elif choice == "connect":
             node_adr = input_dialog(text="Provide node address").run()
-
-        elif choice == "broadcast":
-            if node_adr:
-                send_message(node_adr, "ala ma kota")
-            else:
-                message_dialog(title="Error", text="Node address is not set.").run()
+            try:
+                requests.get(url=f"http://{node_adr}/")
+            except:
+                node_adr = None
 
         elif choice == "transaction":
             if not node_adr:
                 message_dialog(title="Error", text="Node address is not set.").run()
-                continue
+                break
             message = input_dialog(text="Message to send to block").run()
             if not message:
-                continue
+                break
             key_choice = radiolist_dialog(title="Delete keys", values=key_options).run()
-            signed_message = sign_message(key_choice[0], message).decode("utf-8")
+            signature_str = base64.b64encode(
+                sign_message(key_choice[0], message)
+            ).decode("utf-8")
             send_transaction(
                 node_adr,
-                TransactionMessage(message, signed_message, key_choice[0]),
+                TransactionMessage(message, signature_str, key_choice[1]),
             )
 
         elif choice == "exit":

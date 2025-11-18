@@ -11,7 +11,10 @@ def send_message(address: str, message: str):
 
 
 def send_transaction(address: str, transaction: TransactionMessage):
+    data = dataclasses.asdict(transaction)
+    print(data)
     requests.post(
         url=f"http://{address}/transaction",
-        json=json.dumps(dataclasses.asdict(transaction)),
+        headers={"Content-Type": "application/json"},
+        json=data,
     )

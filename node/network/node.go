@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"sync"
 
 	bc "node/blockchain"
@@ -26,6 +27,7 @@ type NodeState struct {
 
 	// Blockchain
 	Blockchain []bc.Block
+	Mempool    []string
 	ChainLock  sync.Mutex
 
 	// Peers
@@ -45,62 +47,73 @@ func NewNodeState(host string, port int) *NodeState {
 	return node
 }
 
-func (n *NodeState) Addr() string {
-	return fmt.Sprintf("%s:%d", n.Host, n.Port)
+func (ns *NodeState) Addr() string {
+	return fmt.Sprintf("%s:%d", ns.Host, ns.Port)
 }
 
-func (n *NodeState) AddPeer(host string, port int) error {
+func (ns *NodeState) AddPeer(host string, port int) error {
 	newPeer := Peer{Host: host, Port: port}
 	addr := newPeer.Addr()
 
-	if addr == n.Addr() {
+	if addr == ns.Addr() {
 		return errors.New("Cannot add self as peer.")
 	}
 
-	n.PeersLock.Lock()
-	n.Peers[addr] = newPeer
-	n.PeersLock.Unlock()
+	ns.PeersLock.Lock()
+	ns.Peers[addr] = newPeer
+	ns.PeersLock.Unlock()
 
 	log.Printf("[I] Added new peer: %s\n", addr)
 	return nil
 }
 
-func (n *NodeState) RemovePeer(peer Peer) {
-	n.PeersLock.Lock()
-	defer n.PeersLock.Unlock()
-	delete(n.Peers, peer.Addr())
+func (ns *NodeState) RemovePeer(peer Peer) {
+	ns.PeersLock.Lock()
+	defer ns.PeersLock.Unlock()
+	delete(ns.Peers, peer.Addr())
 }
 
-func (n *NodeState) PeersList() []Peer {
-	n.PeersLock.RLock()
-	defer n.PeersLock.RUnlock()
+func (ns *NodeState) PeersList() []Peer {
+	ns.PeersLock.RLock()
+	defer ns.PeersLock.RUnlock()
 
-	peerList := make([]Peer, 0, len(n.Peers))
-	for _, peer := range n.Peers {
+	peerList := make([]Peer, 0, len(ns.Peers))
+	for _, peer := range ns.Peers {
 		peerList = append(peerList, peer)
 	}
 
 	return peerList
 }
 
-func (n *NodeState) PeerCount() int {
-	n.PeersLock.RLock()
-	defer n.PeersLock.RUnlock()
-	return len(n.Peers)
+func (ns *NodeState) PeerCount() int {
+	ns.PeersLock.RLock()
+	defer ns.PeersLock.RUnlock()
+	return len(ns.Peers)
 }
 
-func (n *NodeState) AddBlock(block *bc.Block) error {
-	n.ChainLock.Lock()
-	defer n.ChainLock.Unlock()
+func (ns *NodeState) AddBlock(block *bc.Block) error {
+	ns.ChainLock.Lock()
+	defer ns.ChainLock.Unlock()
 
-	lastBlock := n.Blockchain[len(n.Blockchain)-1]
+	lastBlock := ns.Blockchain[len(ns.Blockchain)-1]
 	if lastBlock.Index+1 != block.Index {
 		return errors.New("Indexes mismatch")
 	}
 	if lastBlock.Hash != block.PrevHash {
 		return errors.New("Hash mismatch")
 	}
+	// TODO: sprawdzić ilość 0
 
-	n.Blockchain = append(n.Blockchain, *block)
+	ns.Blockchain = append(ns.Blockchain, *block)
 	return nil
+}
+
+func (ns *NodeState) AddTransaction(transaction string) bool {
+	ns.ChainLock.Lock()
+	defer ns.ChainLock.Unlock()
+	if slices.Contains(ns.Mempool, transaction) {
+		return false
+	}
+	ns.Mempool = append(ns.Mempool, transaction)
+	return true
 }

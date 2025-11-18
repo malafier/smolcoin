@@ -13,7 +13,5 @@ class Transaction:
 @dataclass
 class TransactionMessage:
     transaction: str
-    hash: str
-    sender_pk: str
-    # r: int
-    # s: int
+    signature: str
+    pub_key: str

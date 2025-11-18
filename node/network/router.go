@@ -85,52 +85,19 @@ func (s *Server) handleGetPeers(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]any{"peers": s.State.PeersList()})
 }
 
-type MessageRequest struct {
-	Message string `json:"message"`
-	Sender  string `json:"sender"`
-}
-
-func (s *Server) handleReceiveMessage(w http.ResponseWriter, r *http.Request) {
-	var req MessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid data. 'message' is required.")
-		return
-	}
-	defer r.Body.Close()
-
-	if req.Sender == "" {
-		req.Sender = "Unknown"
-	}
-
-	log.Printf("\n[Message Received from %s]: %s\n\n", req.Sender, req.Message)
-	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Message received."})
-}
-
-func (s *Server) handleBroadcastMessage(w http.ResponseWriter, r *http.Request) {
-	req := struct {
-		Message string `json:"message"`
-	}{}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid data. 'message' is required.")
-		return
-	}
-	defer r.Body.Close()
-
-	go s.broadcastMessage("message", req.Message)
-
-	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Message Broadcasted"})
-}
-
 func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
-	var req *bc.TransactionMessage
+	var req bc.TransactionMessage
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("[E] Failed to decode request: %s\n-- Err: %s", r.Body, err)
 		respondWithError(w, http.StatusBadRequest, "Invalid data.")
 		return
 	}
 	defer r.Body.Close()
 
+	log.Printf("[I] Redieved new transaction %s\n", req.Transaction)
+
 	if !req.TransactionIsValid() {
+		log.Print("[E] Transaction failed verification.\n")
 		respondWithError(w, http.StatusBadRequest, "Transaction failed verification.")
 		return
 	}
@@ -145,12 +112,12 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 
 	message, err := json.Marshal(req)
 	if err != nil {
-		log.Print("Failed to marshal reqest for broadcast for some reason")
+		log.Print("[E] Failed to marshal reqest for broadcast for some reason")
 		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
 		return
 	}
 
-	go s.broadcastMessage("transaction", string(message))
+	go s.broadcastMessage("transaction", message)
 	if s.Miner != nil && !s.Miner.IsMining {
 		go s.Miner.Mine(bc.DEFAULT_DIFFICULTY)
 	}
@@ -177,53 +144,43 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := req.Data
-	if s.Miner != nil {
-		s.Miner.StopMining()
-		s.Miner.DeleteTransactions(data)
-
-		s.State.ChainLock.Lock()
-		s.Miner.PrevBlock = req
-		go s.Miner.Mine(bc.DEFAULT_DIFFICULTY)
-	}
+	// data := req.Data
+	// if s.Miner != nil {
+	// 	s.Miner.StopMining()
+	// 	s.Miner.DeleteTransactions(data)
+	//
+	// 	s.State.ChainLock.Lock()
+	// 	s.Miner.PrevBlock = req
+	// 	go s.Miner.Mine(bc.DEFAULT_DIFFICULTY)
+	// }
 
 	message, err := req.SerializeWithoutHash()
 	if err != nil {
-		log.Print("Failed to marshal reqest for broadcast for some reason")
+		log.Print("[E] Failed to marshal reqest for broadcast for some reason")
 		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
 		return
 	}
+	log.Printf("[I] Redieved new block %s\n", req.Hash[:10])
 
-	go s.broadcastMessage("block", string(message))
+	go s.broadcastMessage("block", message)
 
 	respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Block added to chain"})
 }
 
-func (s *Server) broadcastMessage(uri, message string) {
+func (s *Server) broadcastMessage(uri string, payload []byte) {
 	peerList := s.State.PeersList()
-	log.Printf("Broadcasting message to %d peer(s)...\n", len(peerList))
-
-	payload := MessageRequest{
-		Message: message,
-		Sender:  s.State.Addr(),
-	}
-
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		log.Printf("[E] Failed to marshal broadcast payload: %v\n", err)
-		return
-	}
+	log.Printf("[I] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload))
 
 	var wg sync.WaitGroup
 	for _, peer := range peerList {
 		wg.Add(1)
 		go func(p Peer) {
 			defer wg.Done()
-			s.sendMessageToPeer(p, uri, payloadBytes)
+			s.sendMessageToPeer(p, uri, payload)
 		}(peer)
 	}
 	wg.Wait()
-	log.Println("Broadcast finished.")
+	log.Println("[I] Broadcast finished.")
 }
 
 func (s *Server) sendMessageToPeer(peer Peer, uri string, payload []byte) {
@@ -286,10 +243,8 @@ func (s *Server) StartServer() {
 	router.HandleFunc("GET /", s.handleIndex)
 	router.HandleFunc("GET /peers", s.handleGetPeers)
 	router.HandleFunc("POST /peer", s.handleAddPeer)
-	router.HandleFunc("POST /message", s.handleReceiveMessage)
-	router.HandleFunc("POST /broadcast", s.handleBroadcastMessage)
-	router.HandleFunc("POST /transaction", s.handleNewTransaction)
 	router.HandleFunc("POST /block", s.handleNewBlock)
+	router.HandleFunc("POST /transaction", s.handleNewTransaction)
 
 	handlerWithMiddleware := s.checkPeerHeader(router)
 
