@@ -1,4 +1,5 @@
 import json
+from dataclasses import fields
 
 from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import (
@@ -9,8 +10,9 @@ from prompt_toolkit.shortcuts import (
 )
 
 from src.crypto import decrypt_data, encrypt_data, generate_keys
-from src.network import broadcast_message
+from src.network import send_message
 from src.storage import load_from_file, save_to_file
+from src.transactions import transaction_fields
 
 ### Constants
 KEY_STORAGE_PATH = "./key_store.json"
@@ -54,14 +56,13 @@ def main():
         exit(1)
 
     while True:
-        key_options = [(pair, pair[1]) for pair in keys]
-
         radio_options = [
             ("add", "Generate new pair"),
             ("list", "List all pairs"),
             ("delete", "Delete selected pairs"),
             ("connect", "Connect to node"),
             ("broadcast", "Brodcast message"),
+            ("transaction", "Send transaction"),
             ("exit", "Exit"),
         ]
         text = f"Connected to node: {node_adr}"
@@ -69,24 +70,36 @@ def main():
 
         if choice == "add":
             add_new_keys(password)
+
         elif choice == "list":
             displayed_text = ""
             for pair in keys:
                 displayed_text += f"{pair[0]}\n{pair[1]}\n\n"
             message_dialog(title="Keys", text=displayed_text).run()
+
         elif choice == "delete":
+            key_options = [(pair, pair[1]) for pair in keys]
             delete_choice = checkboxlist_dialog(
                 title="Delete keys", values=key_options
             ).run()
             for pair in delete_choice:
                 delete_key(password, pair)
+
         elif choice == "connect":
             node_adr = input_dialog(text="Provide node address").run()
+
         elif choice == "broadcast":
             if node_adr:
-                broadcast_message(node_adr, "ala ma kota")
+                send_message(node_adr, "ala ma kota")
             else:
                 message_dialog(title="Error", text="Node address is not set.").run()
+
+        elif choice == "transaction":
+            if not node_adr:
+                message_dialog(title="Error", text="Node address is not set.").run()
+                continue
+            results = input_dialog("New transaction").run()
+
         elif choice == "exit":
             break
 
