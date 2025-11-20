@@ -119,7 +119,7 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 
 	go s.broadcastMessage("transaction", message)
 	if s.Miner != nil && !s.Miner.IsMining {
-		go s.Miner.Mine(bc.DEFAULT_DIFFICULTY)
+		go s.Miner.Mine()
 	}
 
 	respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Transaction accepted and broadcasted"})
