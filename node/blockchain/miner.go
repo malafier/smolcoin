@@ -3,6 +3,7 @@ package blockchain
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"slices"
 	"strings"
@@ -40,21 +41,6 @@ func (m *Miner) AddTransaction(transaction string) bool {
 	return true
 }
 
-// func (m *Miner) DeleteTransactions(data string) {
-// 	transactions, err = json.Marshal(data)
-// 	if err != nil {
-// 		log.Print("[W] Failed to marshal transactions.")
-// 	}
-//
-// 	for _, trans := range transactions {
-// 		for i, memEl := range m.Mempool {
-// 			if trans == memEl {
-// 				m.Mempool = slices.Delete(m.Mempool, i, i)
-// 			}
-// 		}
-// 	}
-// }
-
 func (m *Miner) StopMining() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -64,16 +50,7 @@ func (m *Miner) StopMining() {
 	}
 }
 
-// func (m *Miner) GetDifficulty() (int, bool) {
-// 	m.mutex.Lock()
-// 	defer m.mutex.Unlock()
-// 	if len(m.Mempool) == 0 {
-// 		return 0, false
-// 	}
-// 	return m.Mempool[len(m.Mempool)-1].Difficulty, true
-// }
-
-func (m *Miner) Mine(difficulty int) *Block {
+func (m *Miner) Mine() *Block {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if len(m.Mempool) == 0 {
@@ -85,21 +62,24 @@ func (m *Miner) Mine(difficulty int) *Block {
 	var ctx context.Context
 	ctx, m.cancelMining = context.WithCancel(context.Background())
 
-	block := miningLoop(ctx, m.Mempool, difficulty, m.PrevBlock)
+	block, err := m.miningLoop(ctx)
+	if err != nil {
+		log.Printf("%s\n", err.Error())
+	}
 
 	return block
 }
 
-func miningLoop(ctx context.Context, transactions []string, difficulty int, prevBlock *Block) *Block {
-	prefix := strings.Repeat("0", difficulty)
-	blockData, err := json.Marshal(transactions)
+func (m *Miner) miningLoop(ctx context.Context) (*Block, error) {
+	prefix := strings.Repeat("0", m.Difficulty)
+	blockData, err := json.Marshal(m.Mempool)
 	if err != nil {
-		log.Printf("Failed to marshal transactions.")
+		return nil, errors.New("Failed to marshal transactions.")
 	}
 
 	block := &Block{
-		Index:     prevBlock.Index + 1,
-		PrevHash:  prevBlock.Hash,
+		Index:     m.PrevBlock.Index + 1,
+		PrevHash:  m.PrevBlock.Hash,
 		Data:      string(blockData),
 		Timestamp: time.Now().Unix(),
 		Nonce:     0,
@@ -108,19 +88,20 @@ func miningLoop(ctx context.Context, transactions []string, difficulty int, prev
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return nil, nil
 		default:
 		}
 
 		blockJson, err := block.SerializeWithoutHash()
 		if err != nil {
 			log.Printf("Failed to marshal a block.")
+			continue
 		}
 
 		blockHash := hash(blockJson)
 		if strings.HasPrefix(blockHash, prefix) {
 			block.Hash = blockHash
-			return block
+			return block, nil
 		} else {
 			block.Nonce++
 		}
