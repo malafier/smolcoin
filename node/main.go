@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 
+	bc "node/blockchain"
 	. "node/network"
 )
 
@@ -13,6 +14,6 @@ func main() {
 	mine := flag.Bool("M", false, "Flag if node is a miner")
 	flag.Parse()
 
-	server := NewServer(NewNodeState(*host, *port), *peer, *mine)
+	server := NewServer(NewNodeState(*host, *port), *peer, *mine, bc.DEFAULT_DIFFICULTY)
 	server.StartServer()
 }

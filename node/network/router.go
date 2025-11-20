@@ -19,10 +19,10 @@ type Server struct {
 	Miner *bc.Miner
 }
 
-func NewServer(state *NodeState, initialPeer string, ifMiner bool) *Server {
+func NewServer(state *NodeState, initialPeer string, ifMiner bool, difficulty int) *Server {
 	var miner *bc.Miner
 	if ifMiner {
-		miner = bc.NewMiner()
+		miner = bc.NewMiner(difficulty)
 	}
 	server := &Server{State: state, Miner: miner}
 	server.connectToInitialPeer(initialPeer)

@@ -15,16 +15,18 @@ const DEFAULT_DIFFICULTY int = 5
 type Miner struct {
 	Mempool      []string
 	IsMining     bool
+	Difficulty   int
 	PrevBlock    *Block
 	cancelMining context.CancelFunc
 	mutex        sync.Mutex
 }
 
-func NewMiner() *Miner {
+func NewMiner(difficlty int) *Miner {
 	return &Miner{
-		Mempool:   []string{},
-		PrevBlock: &Genesis,
-		IsMining:  false,
+		Difficulty: difficlty,
+		Mempool:    []string{},
+		PrevBlock:  &Genesis,
+		IsMining:   false,
 	}
 }
 
