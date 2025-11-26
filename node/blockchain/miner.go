@@ -2,8 +2,6 @@ package blockchain
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"log"
 	"slices"
 	"strings"
@@ -15,9 +13,9 @@ const DEFAULT_DIFFICULTY int = 5
 
 type Miner struct {
 	Mempool      []string
+	PrevBlock    *Block
 	IsMining     bool
 	Difficulty   int
-	PrevBlock    *Block
 	cancelMining context.CancelFunc
 	mutex        sync.Mutex
 }
@@ -72,15 +70,11 @@ func (m *Miner) Mine() *Block {
 
 func (m *Miner) miningLoop(ctx context.Context) (*Block, error) {
 	prefix := strings.Repeat("0", m.Difficulty)
-	blockData, err := json.Marshal(m.Mempool)
-	if err != nil {
-		return nil, errors.New("Failed to marshal transactions.")
-	}
 
 	block := &Block{
 		Index:     m.PrevBlock.Index + 1,
 		PrevHash:  m.PrevBlock.Hash,
-		Data:      string(blockData),
+		Data:      m.Mempool,
 		Timestamp: time.Now().Unix(),
 		Nonce:     0,
 	}
@@ -102,8 +96,7 @@ func (m *Miner) miningLoop(ctx context.Context) (*Block, error) {
 		if strings.HasPrefix(blockHash, prefix) {
 			block.Hash = blockHash
 			return block, nil
-		} else {
-			block.Nonce++
 		}
+		block.Nonce++
 	}
 }

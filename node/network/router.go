@@ -143,15 +143,16 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// data := req.Data
-	// if s.Miner != nil {
-	// 	s.Miner.StopMining()
-	// 	s.Miner.DeleteTransactions(data)
-	//
-	// 	s.State.ChainLock.Lock()
-	// 	s.Miner.PrevBlock = req
-	// 	go s.Miner.Mine(bc.DEFAULT_DIFFICULTY)
-	// }
+	data := req.Data
+	intersection := sliceIntersection(data, s.State.Mempool)
+	// TODO: remove from State.Mempool
+	if s.Miner != nil {
+		s.Miner.StopMining()
+
+		s.State.ChainLock.Lock()
+		s.Miner.PrevBlock = req
+		go s.Miner.Mine()
+	}
 
 	message, err := req.SerializeWithoutHash()
 	if err != nil {

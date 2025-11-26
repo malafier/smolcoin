@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"time"
 )
 
@@ -29,4 +30,21 @@ func checkPeerDead(peer Peer) bool {
 	checkClient := http.Client{Timeout: 1 * time.Second}
 	_, err := checkClient.Get(fmt.Sprintf("http://%s/", peer.Addr()))
 	return err != nil
+}
+
+func sliceIntersection(s1, s2 []string) []string {
+	set := make(map[string]bool)
+	for _, item := range s1 {
+		set[item] = false
+	}
+
+	var intersection []string
+	for _, item := range s2 {
+		_, found := set[item]
+		if found && slices.Contains(intersection, item) {
+			intersection = append(intersection, item)
+		}
+	}
+
+	return intersection
 }
