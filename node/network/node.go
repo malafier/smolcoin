@@ -29,8 +29,11 @@ type NodeState struct {
 
 	// Blockchain
 	Blockchain []bc.Block
-	Mempool    []string
 	ChainLock  sync.Mutex
+
+	// Mempool
+	Mempool  []string
+	PoolLock sync.Mutex
 
 	// Peers
 	Peers     map[string]Peer
@@ -115,8 +118,8 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 }
 
 func (ns *NodeState) AddTransaction(transaction string) bool {
-	ns.ChainLock.Lock()
-	defer ns.ChainLock.Unlock()
+	ns.PoolLock.Lock()
+	defer ns.PoolLock.Unlock()
 	if slices.Contains(ns.Mempool, transaction) {
 		return false
 	}
