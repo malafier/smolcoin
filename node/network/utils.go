@@ -22,6 +22,10 @@ func respondWithJSON(w http.ResponseWriter, code int, payload any) {
 	w.Write(response)
 }
 
+func respondWithMessage(w http.ResponseWriter, code int, message string) {
+	respondWithJSON(w, code, map[string]string{"message": message})
+}
+
 func respondWithError(w http.ResponseWriter, code int, message string) {
 	respondWithJSON(w, code, map[string]string{"error": message})
 }

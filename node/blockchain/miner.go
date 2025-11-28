@@ -17,7 +17,7 @@ type Miner struct {
 	IsMining     bool
 	Difficulty   int
 	cancelMining context.CancelFunc
-	mutex        sync.Mutex
+	Mutex        sync.Mutex
 }
 
 func NewMiner(difficlty int) *Miner {
@@ -30,8 +30,8 @@ func NewMiner(difficlty int) *Miner {
 }
 
 func (m *Miner) AddTransaction(transaction string) bool {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
 	if slices.Contains(m.Mempool, transaction) {
 		return false
 	}
@@ -40,8 +40,8 @@ func (m *Miner) AddTransaction(transaction string) bool {
 }
 
 func (m *Miner) StopMining() {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
 	if m.IsMining {
 		m.IsMining = false
 		m.cancelMining()
@@ -49,8 +49,8 @@ func (m *Miner) StopMining() {
 }
 
 func (m *Miner) Mine() *Block {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
 	if len(m.Mempool) == 0 {
 		m.IsMining = false
 		log.Printf("Nothing to mine.")

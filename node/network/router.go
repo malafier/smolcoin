@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -76,9 +77,7 @@ func (s *Server) handleAddPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, map[string]any{
-		"message": "Peer added successfully.",
-	})
+	respondWithMessage(w, http.StatusCreated, "Peer added successfully.")
 }
 
 func (s *Server) handleGetPeers(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +93,7 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Printf("[I] Redieved new transaction %s\n", req.Transaction)
+	log.Printf("[I] Recieved new transaction: %s\n", req.Transaction)
 
 	if !req.TransactionIsValid() {
 		log.Print("[E] Transaction failed verification.\n")
@@ -102,10 +101,16 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.Miner != nil {
+	added := s.State.AddTransaction(req.Transaction)
+	if !added {
+		respondWithMessage(w, http.StatusAccepted, "Transaction already recived.")
+		return
+	}
+
+	if s.Miner != nil && !s.Miner.IsMining {
 		added := s.Miner.AddTransaction(req.Transaction)
 		if !added {
-			respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Transaction already recived."})
+			respondWithMessage(w, http.StatusAccepted, "Transaction already recived.")
 			return
 		}
 	}
@@ -122,7 +127,7 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 		go s.Miner.Mine()
 	}
 
-	respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Transaction accepted and broadcasted"})
+	respondWithMessage(w, http.StatusAccepted, "Transaction accepted and broadcasted")
 }
 
 func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
@@ -143,14 +148,25 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[I] Recieved new block %s\n", req.Hash[:10])
+
+	s.State.PoolLock.Lock()
 	data := req.Data
 	intersection := sliceIntersection(data, s.State.Mempool)
-	// TODO: remove from State.Mempool
+	for i, item := range s.State.Mempool {
+		if slices.Contains(intersection, item) {
+			s.State.Mempool = slices.Delete(s.State.Mempool, i, i)
+		}
+	}
+	s.State.PoolLock.Unlock()
+
 	if s.Miner != nil {
 		s.Miner.StopMining()
 
-		s.State.ChainLock.Lock()
+		s.Miner.Mutex.Lock()
 		s.Miner.PrevBlock = req
+		s.Miner.Mempool = s.State.Mempool
+		s.Miner.Mutex.Unlock()
 		go s.Miner.Mine()
 	}
 
@@ -160,11 +176,10 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
 		return
 	}
-	log.Printf("[I] Redieved new block %s\n", req.Hash[:10])
 
 	go s.broadcastMessage("block", message)
 
-	respondWithJSON(w, http.StatusAccepted, map[string]string{"message": "Block added to chain"})
+	respondWithMessage(w, http.StatusAccepted, "Block added to chain")
 }
 
 func (s *Server) broadcastMessage(uri string, payload []byte) {

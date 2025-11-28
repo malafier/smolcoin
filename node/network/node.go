@@ -123,6 +123,14 @@ func (ns *NodeState) AddTransaction(transaction string) bool {
 	if slices.Contains(ns.Mempool, transaction) {
 		return false
 	}
+
+	ns.ChainLock.Lock()
+	defer ns.ChainLock.Unlock()
+	for _, block := range ns.Blockchain {
+		if slices.Contains(block.Data, transaction) {
+			return false
+		}
+	}
 	ns.Mempool = append(ns.Mempool, transaction)
 	return true
 }
