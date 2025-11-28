@@ -1,5 +1,4 @@
 import dataclasses
-import json
 
 import requests
 
@@ -12,7 +11,7 @@ def send_message(address: str, message: str):
 
 def send_transaction(address: str, transaction: TransactionMessage):
     data = dataclasses.asdict(transaction)
-    print(data)
+    # print(data)
     requests.post(
         url=f"http://{address}/transaction",
         headers={"Content-Type": "application/json"},
