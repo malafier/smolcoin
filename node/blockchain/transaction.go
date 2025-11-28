@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -12,13 +13,43 @@ import (
 	"strings"
 )
 
-// type Transaction struct {
-// 	Sender     string  `json:"sender"`
-// 	Reciever   string  `json:"reciever"`
-// 	Ammount    float32 `json:"ammount"`
-// 	Timestamp  int     `json:"timestamp"`
-// 	Difficulty int     `json:"difficulty"`
-// }
+type Transaction struct {
+	Sender     string  `json:"sender"`
+	Reciever   string  `json:"reciever"`
+	Ammount    float32 `json:"ammount"`
+	Timestamp  int     `json:"timestamp"`
+	Difficulty int     `json:"difficulty"`
+	Hash       string  `json:"hash"`
+}
+
+func (t *Transaction) Serialize() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+func (t *Transaction) SerializeWithoutHash() ([]byte, error) {
+	data := struct {
+		Sender     string  `json:"sender"`
+		Reciever   string  `json:"reciever"`
+		Ammount    float32 `json:"ammount"`
+		Timestamp  int     `json:"timestamp"`
+		Difficulty int     `json:"difficulty"`
+	}{
+		Sender:     t.Sender,
+		Reciever:   t.Reciever,
+		Ammount:    t.Ammount,
+		Timestamp:  t.Timestamp,
+		Difficulty: t.Difficulty,
+	}
+	return json.Marshal(data)
+}
+
+func (t *Transaction) String() string {
+	jsonBytes, err := t.Serialize()
+	if err != nil {
+		return ""
+	}
+	return string(jsonBytes)
+}
 
 type TransactionMessage struct {
 	Transaction string `json:"transaction"`
