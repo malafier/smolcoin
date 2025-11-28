@@ -34,3 +34,4 @@ done
 
 tmux select-layout -t "$SESSION_NAME:1" tiled
 
+tmux attach
