@@ -60,6 +60,10 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Node running on %s", s.State.Addr())
 }
 
+func (s *Server) handleGetIds(w http.ResponseWriter, r *http.Request) {
+	respondWithJSON(w, http.StatusOK, map[string][]string{"ids": s.State.Ids})
+}
+
 func (s *Server) handleAddPeer(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		Host string `json:"host"`
@@ -85,7 +89,7 @@ func (s *Server) handleGetPeers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
-	var req bc.TransactionMessage
+	var req bc.Transaction
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("[E] Failed to decode request: %s\n-- Err: %s", r.Body, err)
 		respondWithError(w, http.StatusBadRequest, "Invalid data.")
@@ -93,7 +97,7 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Printf("[I] Recieved new transaction: %s\n", req.Transaction)
+	log.Printf("[I] Recieved new transaction: %s\n", req.String())
 
 	if !req.TransactionIsValid() {
 		log.Print("[E] Transaction failed verification.\n")
@@ -101,14 +105,14 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	added := s.State.AddTransaction(req.Transaction)
+	added := s.State.AddTransaction(req)
 	if !added {
 		respondWithMessage(w, http.StatusAccepted, "Transaction already recived.")
 		return
 	}
 
 	if s.Miner != nil && !s.Miner.IsMining {
-		added := s.Miner.AddTransaction(req.Transaction)
+		added := s.Miner.AddTransaction(req)
 		if !added {
 			respondWithMessage(w, http.StatusAccepted, "Transaction already recived.")
 			return
@@ -151,11 +155,11 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[I] Recieved new block %s\n", req.Hash[:10])
 
 	s.State.PoolLock.Lock()
-	data := req.Data
-	intersection := sliceIntersection(data, s.State.Mempool)
-	for i, item := range s.State.Mempool {
+	data := req.Transactions
+	intersection := sliceIntersection(data, s.State.TransactionPool)
+	for i, item := range s.State.TransactionPool {
 		if slices.Contains(intersection, item) {
-			s.State.Mempool = slices.Delete(s.State.Mempool, i, i)
+			s.State.TransactionPool = slices.Delete(s.State.TransactionPool, i, i)
 		}
 	}
 	s.State.PoolLock.Unlock()
@@ -165,7 +169,7 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 
 		s.Miner.Mutex.Lock()
 		s.Miner.PrevBlock = req
-		s.Miner.Mempool = s.State.Mempool
+		s.Miner.Mempool = s.State.TransactionPool
 		s.Miner.Mutex.Unlock()
 		go s.Miner.Mine()
 	}
@@ -256,6 +260,7 @@ func (s *Server) StartServer() {
 	router := http.NewServeMux()
 
 	router.HandleFunc("GET /", s.handleIndex)
+	router.HandleFunc("GET /users", s.handleGetIds)
 	router.HandleFunc("GET /peers", s.handleGetPeers)
 	router.HandleFunc("POST /peer", s.handleAddPeer)
 	router.HandleFunc("POST /block", s.handleNewBlock)

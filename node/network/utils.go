@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"slices"
 	"time"
+
+	bc "node/blockchain"
 )
 
 func respondWithJSON(w http.ResponseWriter, code int, payload any) {
@@ -36,13 +38,13 @@ func checkPeerDead(peer Peer) bool {
 	return err != nil
 }
 
-func sliceIntersection(s1, s2 []string) []string {
-	set := make(map[string]bool)
+func sliceIntersection(s1, s2 []bc.Transaction) []bc.Transaction {
+	set := make(map[bc.Transaction]bool)
 	for _, item := range s1 {
 		set[item] = false
 	}
 
-	var intersection []string
+	var intersection []bc.Transaction
 	for _, item := range s2 {
 		_, found := set[item]
 		if found && slices.Contains(intersection, item) {

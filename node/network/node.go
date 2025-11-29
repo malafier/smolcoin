@@ -26,14 +26,15 @@ type NodeState struct {
 	Port       int
 	PeerHeader http.Header
 	Difficulty int
+	Ids        []string
 
 	// Blockchain
 	Blockchain []bc.Block
 	ChainLock  sync.Mutex
 
-	// Mempool
-	Mempool  []string
-	PoolLock sync.Mutex
+	// TransactionPool
+	TransactionPool []bc.Transaction
+	PoolLock        sync.Mutex
 
 	// Peers
 	Peers     map[string]Peer
@@ -117,20 +118,20 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	return nil
 }
 
-func (ns *NodeState) AddTransaction(transaction string) bool {
+func (ns *NodeState) AddTransaction(transaction bc.Transaction) bool {
 	ns.PoolLock.Lock()
 	defer ns.PoolLock.Unlock()
-	if slices.Contains(ns.Mempool, transaction) {
+	if slices.Contains(ns.TransactionPool, transaction) {
 		return false
 	}
 
 	ns.ChainLock.Lock()
 	defer ns.ChainLock.Unlock()
 	for _, block := range ns.Blockchain {
-		if slices.Contains(block.Data, transaction) {
+		if slices.Contains(block.Transactions, transaction) {
 			return false
 		}
 	}
-	ns.Mempool = append(ns.Mempool, transaction)
+	ns.TransactionPool = append(ns.TransactionPool, transaction)
 	return true
 }
