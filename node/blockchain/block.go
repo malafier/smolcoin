@@ -7,12 +7,12 @@ import (
 )
 
 type Block struct {
-	Nonce     int      `json:"nonce"`
-	Index     int      `json:"index"`
-	PrevHash  string   `json:"prev_hash"`
-	Timestamp int64    `json:"timestamp"`
-	Data      []string `json:"data"`
-	Hash      string   `json:"hash,omitempty"`
+	Nonce        int           `json:"nonce"`
+	Index        int           `json:"index"`
+	PrevHash     string        `json:"prev_hash"`
+	Timestamp    int64         `json:"timestamp"`
+	Transactions []Transaction `json:"trans"`
+	Hash         string        `json:"hash,omitempty"`
 }
 
 func (b *Block) IsValid() bool {
@@ -33,17 +33,17 @@ func (b *Block) Serialize() ([]byte, error) {
 
 func (b *Block) SerializeWithoutHash() ([]byte, error) {
 	data := struct {
-		Index     int      `json:"index"`
-		PrevHash  string   `json:"prev_hash"`
-		Timestamp int64    `json:"timestamp"`
-		Data      []string `json:"data"`
-		Nonce     int      `json:"nonce"`
+		Index        int           `json:"index"`
+		PrevHash     string        `json:"prev_hash"`
+		Timestamp    int64         `json:"timestamp"`
+		Transactions []Transaction `json:"trans"`
+		Nonce        int           `json:"nonce"`
 	}{
-		Index:     b.Index,
-		PrevHash:  b.PrevHash,
-		Timestamp: b.Timestamp,
-		Data:      b.Data,
-		Nonce:     b.Nonce,
+		Index:        b.Index,
+		PrevHash:     b.PrevHash,
+		Timestamp:    b.Timestamp,
+		Transactions: b.Transactions,
+		Nonce:        b.Nonce,
 	}
 	return json.Marshal(data)
 }
@@ -57,9 +57,9 @@ func (b *Block) CreateHash() (string, error) {
 }
 
 var Genesis = Block{
-	Index:     0,
-	PrevHash:  "0",
-	Timestamp: 1761773051,
-	Data:      []string{"GENESIS"},
-	Hash:      "a80c2a115782e2699002fc1104a53507014b0694dd706e2ab1c4172c3ce6d234",
+	Index:        0,
+	PrevHash:     "0",
+	Timestamp:    1761773051,
+	Transactions: []Transaction{},
+	Hash:         "a80c2a115782e2699002fc1104a53507014b0694dd706e2ab1c4172c3ce6d234",
 }

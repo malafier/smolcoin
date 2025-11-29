@@ -12,7 +12,7 @@ import (
 const DEFAULT_DIFFICULTY int = 5
 
 type Miner struct {
-	Mempool      []string
+	Mempool      []Transaction
 	PrevBlock    *Block
 	IsMining     bool
 	Difficulty   int
@@ -23,13 +23,13 @@ type Miner struct {
 func NewMiner(difficlty int) *Miner {
 	return &Miner{
 		Difficulty: difficlty,
-		Mempool:    []string{},
+		Mempool:    []Transaction{},
 		PrevBlock:  &Genesis,
 		IsMining:   false,
 	}
 }
 
-func (m *Miner) AddTransaction(transaction string) bool {
+func (m *Miner) AddTransaction(transaction Transaction) bool {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 	if slices.Contains(m.Mempool, transaction) {
@@ -72,11 +72,11 @@ func (m *Miner) miningLoop(ctx context.Context) (*Block, error) {
 	prefix := strings.Repeat("0", m.Difficulty)
 
 	block := &Block{
-		Index:     m.PrevBlock.Index + 1,
-		PrevHash:  m.PrevBlock.Hash,
-		Data:      m.Mempool,
-		Timestamp: time.Now().Unix(),
-		Nonce:     0,
+		Index:        m.PrevBlock.Index + 1,
+		PrevHash:     m.PrevBlock.Hash,
+		Transactions: m.Mempool,
+		Timestamp:    time.Now().Unix(),
+		Nonce:        0,
 	}
 
 	for {

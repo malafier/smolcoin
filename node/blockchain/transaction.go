@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -19,14 +20,15 @@ type Transaction struct {
 	Ammount    float32 `json:"ammount"`
 	Timestamp  int     `json:"timestamp"`
 	Difficulty int     `json:"difficulty"`
-	Hash       string  `json:"hash"`
+	PublicKey  string  `json:"pub_key"`
+	Signature  string  `json:"signature"`
 }
 
 func (t *Transaction) Serialize() ([]byte, error) {
 	return json.Marshal(t)
 }
 
-func (t *Transaction) SerializeWithoutHash() ([]byte, error) {
+func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 	data := struct {
 		Sender     string  `json:"sender"`
 		Reciever   string  `json:"reciever"`
@@ -44,33 +46,34 @@ func (t *Transaction) SerializeWithoutHash() ([]byte, error) {
 }
 
 func (t *Transaction) String() string {
-	jsonBytes, err := t.Serialize()
-	if err != nil {
-		return ""
-	}
-	return string(jsonBytes)
+	var out bytes.Buffer
+	out.WriteString("From: ")
+	out.WriteString(t.Sender[:10])
+	out.WriteString("  To: ")
+	out.WriteString(t.Reciever[:10])
+	out.WriteString("  Ammount: ")
+	out.WriteString(fmt.Sprintf("%f\n", t.Ammount))
+	return out.String()
 }
 
-type TransactionMessage struct {
-	Transaction string `json:"transaction"`
-	Signature   string `json:"signature"`
-	PublicKey   string `json:"pub_key"`
-}
-
-func (tm *TransactionMessage) TransactionIsValid() bool {
-	publicKey, err := pemToPublicKey(tm.PublicKey)
+func (t *Transaction) TransactionIsValid() bool {
+	publicKey, err := pemToPublicKey(t.PublicKey)
 	if err != nil {
 		log.Printf("%s\n", err)
 		return false
 	}
 
-	signature, err := base64.StdEncoding.DecodeString(tm.Signature)
+	signature, err := base64.StdEncoding.DecodeString(t.Signature)
 	if err != nil {
 		log.Printf("%s\n", err)
 		return false
 	}
 
-	hashedData := sha256.Sum256([]byte(tm.Transaction))
+	serializedData, err := t.SerializeWithoutSign()
+	if err != nil {
+		return false
+	}
+	hashedData := sha256.Sum256(serializedData)
 	return ecdsa.VerifyASN1(publicKey, hashedData[:], signature)
 }
 
