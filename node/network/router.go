@@ -61,7 +61,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetIds(w http.ResponseWriter, r *http.Request) {
-	respondWithJSON(w, http.StatusOK, map[string][]string{"ids": s.State.Ids})
+	respondWithJSON(w, http.StatusOK, map[string][]string{"ids": s.State.GetIds()})
 }
 
 func (s *Server) handleAddPeer(w http.ResponseWriter, r *http.Request) {

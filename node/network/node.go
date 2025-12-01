@@ -26,10 +26,10 @@ type NodeState struct {
 	Port       int
 	PeerHeader http.Header
 	Difficulty int
-	Ids        []string
 
 	// Blockchain
 	Blockchain []bc.Block
+	Ledger     map[string]float32
 	ChainLock  sync.Mutex
 
 	// TransactionPool
@@ -134,4 +134,29 @@ func (ns *NodeState) AddTransaction(transaction bc.Transaction) bool {
 	}
 	ns.TransactionPool = append(ns.TransactionPool, transaction)
 	return true
+}
+
+func (ns *NodeState) UpdateLedger() {
+	ns.ChainLock.Lock()
+	defer ns.ChainLock.Unlock()
+
+	ledger := make(map[string]float32)
+	for _, block := range ns.Blockchain {
+		for _, trans := range block.Transactions {
+			ledger[trans.Sender] -= trans.Ammount
+			ledger[trans.Reciever] += trans.Ammount
+		}
+	}
+	ns.Ledger = ledger
+}
+
+func (ns *NodeState) GetIds() []string {
+	ns.ChainLock.Lock()
+	defer ns.ChainLock.Unlock()
+
+	keys := []string{}
+	for key := range ns.Ledger {
+		keys = append(keys, key)
+	}
+	return keys
 }
