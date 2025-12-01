@@ -70,11 +70,15 @@ func (m *Miner) Mine() *Block {
 
 func (m *Miner) miningLoop(ctx context.Context) (*Block, error) {
 	prefix := strings.Repeat("0", m.Difficulty)
+	transactions, err := transToStr(m.Mempool)
+	if err != nil {
+		return nil, err
+	}
 
 	block := &Block{
 		Index:        m.PrevBlock.Index + 1,
 		PrevHash:     m.PrevBlock.Hash,
-		Transactions: m.Mempool,
+		Transactions: transactions,
 		Timestamp:    time.Now().Unix(),
 		Nonce:        0,
 	}
