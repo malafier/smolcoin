@@ -9,6 +9,13 @@ class Transaction:
     timestamp: int
     difficulty: int
 
+    def __init__(self) -> None:
+        self.sender = ""
+        self.reciever = ""
+        self.ammount = 0.0
+        self.timestamp = 0
+        self.difficulty = 0
+
 
 @dataclass
 class TransactionMessage:

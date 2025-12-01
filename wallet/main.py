@@ -11,9 +11,9 @@ from prompt_toolkit.shortcuts import (
 )
 
 from src.crypto import decrypt_data, encrypt_data, generate_keys, sign_message
-from src.network import send_transaction
+from src.network import get_possible_ids, send_transaction
 from src.storage import load_from_file, save_to_file
-from src.transactions import TransactionMessage
+from src.transactions import Transaction, TransactionMessage
 
 ### Constants
 KEY_STORAGE_PATH = "./key_store.json"
@@ -96,16 +96,52 @@ def main():
             if not node_adr:
                 message_dialog(title="Error", text="Node address is not set.").run()
                 break
-            message = input_dialog(text="Message to send to block").run()
-            if not message:
+
+            transaction = Transaction()
+            key_chosen = None
+            while True:
+                transaction_options = [
+                    (
+                        "sender",
+                        f"Sender: {key_chosen if not key_chosen else key_chosen[1][:8]}",
+                    ),
+                    ("reciever", f"Reciever: {transaction.reciever}"),
+                    ("ammount", f"Ammount: {transaction.ammount}"),
+                    ("difficulty", f"Difficulty: {transaction.difficulty}"),
+                    ("send", "Send"),
+                ]
+
+                transaction_choice = radiolist_dialog(
+                    title="New Transaction", values=transaction_options
+                ).run()
+                if transaction_choice == "sender":
+                    key_chosen = radiolist_dialog(
+                        title="Chose identity", values=key_options
+                    ).run()[1]
+                elif transaction_choice == "reciever":
+                    reciever_choice = get_possible_ids(node_adr)
+                    transaction.reciever = radiolist_dialog(
+                        title="Chose reciever", values=[(x, x) for x in reciever_choice]
+                    ).run()
+                elif transaction_choice == "ammount":
+                    transaction.ammount = float(input_dialog(text="Set ammount").run())
+                elif transaction_choice == "difficulty":
+                    transaction.difficulty = int(
+                        input_dialog(text="Set difficulty").run()
+                    )
+                elif transaction_choice == "send":
+                    break
+
+            if not key_chosen:
                 break
-            key_choice = radiolist_dialog(title="Delete keys", values=key_options).run()
+            transaction.sender = key_chosen[1]
+            trans_str = json.dumps(transaction, sort_keys=True)
             signature_str = base64.b64encode(
-                sign_message(key_choice[0], message)
+                sign_message(key_chosen[0], trans_str)
             ).decode("utf-8")
             send_transaction(
                 node_adr,
-                TransactionMessage(message, signature_str, key_choice[1]),
+                TransactionMessage(trans_str, signature_str, key_chosen[1]),
             )
 
         elif choice == "exit":

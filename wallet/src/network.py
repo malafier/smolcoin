@@ -1,4 +1,5 @@
 import dataclasses
+import json
 
 import requests
 
@@ -17,3 +18,11 @@ def send_transaction(address: str, transaction: TransactionMessage):
         headers={"Content-Type": "application/json"},
         json=data,
     )
+
+
+def get_possible_ids(address: str) -> list[str]:
+    resp = requests.get(
+        url=f"http://{address}/ids",
+    )
+    ids_str = resp.json()
+    return json.loads(ids_str)["ids"]
