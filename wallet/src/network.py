@@ -20,7 +20,7 @@ def send_transaction(address: str, transaction: TransactionMessage):
     )
 
 
-def get_possible_ids(address: str) -> list[str]:
+def get_possible_pubs(address: str) -> list[str]:
     resp = requests.get(
         url=f"http://{address}/ids",
     )

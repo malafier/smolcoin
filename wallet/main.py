@@ -11,7 +11,7 @@ from prompt_toolkit.shortcuts import (
 )
 
 from src.crypto import decrypt_data, encrypt_data, generate_keys, sign_message
-from src.network import get_possible_ids, send_transaction
+from src.network import get_possible_pubs, send_transaction
 from src.storage import load_from_file, save_to_file
 from src.transactions import Transaction, TransactionMessage
 
@@ -119,7 +119,7 @@ def main():
                         title="Chose identity", values=key_options
                     ).run()[1]
                 elif transaction_choice == "reciever":
-                    reciever_choice = get_possible_ids(node_adr)
+                    reciever_choice = get_possible_pubs(node_adr)
                     transaction.reciever = radiolist_dialog(
                         title="Chose reciever", values=[(x, x) for x in reciever_choice]
                     ).run()
