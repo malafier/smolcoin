@@ -45,6 +45,14 @@ func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 	return json.Marshal(data)
 }
 
+func (t *Transaction) Hash() (string, error) {
+	serialized, err := t.SerializeWithoutSign()
+	if err != nil {
+		return "", err
+	}
+	return hash(serialized), err
+}
+
 func (t *Transaction) String() string {
 	var out bytes.Buffer
 	out.WriteString("From: ")

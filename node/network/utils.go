@@ -38,14 +38,14 @@ func checkPeerDead(peer Peer) bool {
 	return err != nil
 }
 
-func sliceIntersection(s1, s2 []bc.Transaction) []bc.Transaction {
+func sliceIntersection(t1, t2 []bc.Transaction) []bc.Transaction {
 	set := make(map[bc.Transaction]bool)
-	for _, item := range s1 {
+	for _, item := range t1 {
 		set[item] = false
 	}
 
 	var intersection []bc.Transaction
-	for _, item := range s2 {
+	for _, item := range t2 {
 		_, found := set[item]
 		if found && slices.Contains(intersection, item) {
 			intersection = append(intersection, item)

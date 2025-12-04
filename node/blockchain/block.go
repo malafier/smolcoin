@@ -12,7 +12,7 @@ type Block struct {
 	PrevHash     string `json:"prev_hash"`
 	Timestamp    int64  `json:"timestamp"`
 	Transactions string `json:"trans"`
-	Hash         string `json:"hash,omitempty"`
+	Hash         string `json:"hash"`
 }
 
 func (b *Block) IsValid() bool {
@@ -25,6 +25,15 @@ func (b *Block) IsValid() bool {
 		return false
 	}
 	return hash(blockJson) == b.Hash
+}
+
+func (b *Block) ParseTransactions() ([]Transaction, error) {
+	var trans []Transaction
+	err := json.Unmarshal([]byte(b.Transactions), &trans)
+	if err != nil {
+		return nil, err
+	}
+	return trans, nil
 }
 
 func (b *Block) Serialize() ([]byte, error) {

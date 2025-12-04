@@ -128,7 +128,13 @@ func (ns *NodeState) AddTransaction(transaction bc.Transaction) bool {
 	ns.ChainLock.Lock()
 	defer ns.ChainLock.Unlock()
 	for _, block := range ns.Blockchain {
-		if slices.Contains(block.Transactions, transaction) {
+		transactions, err := block.ParseTransactions()
+		if err != nil {
+			log.Panic("[F] Transactions in blockchain cannot be parsed")
+			return false
+		}
+
+		if slices.Contains(transactions, transaction) {
 			return false
 		}
 	}
@@ -142,7 +148,13 @@ func (ns *NodeState) UpdateLedger() {
 
 	ledger := make(map[string]float32)
 	for _, block := range ns.Blockchain {
-		for _, trans := range block.Transactions {
+		transactions, err := block.ParseTransactions()
+		if err != nil {
+			log.Print("Failed to paarse transactions for some reason")
+			continue
+		}
+
+		for _, trans := range transactions {
 			ledger[trans.Sender] -= trans.Ammount
 			ledger[trans.Reciever] += trans.Ammount
 		}

@@ -155,7 +155,11 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[I] Recieved new block %s\n", req.Hash[:10])
 
 	s.State.PoolLock.Lock()
-	data := req.Transactions
+	data, err := req.ParseTransactions()
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to parse transactions in block")
+		return
+	}
 	intersection := sliceIntersection(data, s.State.TransactionPool)
 	for i, item := range s.State.TransactionPool {
 		if slices.Contains(intersection, item) {
