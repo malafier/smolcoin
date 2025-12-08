@@ -37,13 +37,7 @@ func (m *Miner) ListenAndMine() {
 	prefix := strings.Repeat("0", m.difficulty)
 	log.Println("[Miner] Started mining...")
 
-	block := &Block{
-		Index:        0,
-		PrevHash:     "",
-		Transactions: "",
-		Timestamp:    time.Now().Unix(),
-		Nonce:        0,
-	}
+	block := &Block{}
 
 	// Mining loop
 	for {
