@@ -21,8 +21,8 @@ func main() {
 		miner.ListenAndMine()
 	}
 
-	state := NewNodeState(*host, *port)
+	state := NewNodeState(*host, *port, miner)
 
-	server := NewServer(state, miner, *peer)
+	server := NewServer(state, *peer)
 	server.Start()
 }

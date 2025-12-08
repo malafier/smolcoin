@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"slices"
 	"sync"
 	"time"
 
@@ -15,18 +14,11 @@ import (
 )
 
 type Server struct {
-	State      *state.NodeState
-	minerTx    chan<- bc.Transaction
-	minerReset chan<- bc.NetPayload
+	State *state.NodeState
 }
 
-func NewServer(state *state.NodeState, miner *bc.Miner, initialPeer string) *Server {
-	var server *Server
-	if miner != nil {
-		server = &Server{State: state, minerTx: miner.InTx, minerReset: miner.InReset}
-	} else {
-		server = &Server{State: state, minerTx: nil, minerReset: nil}
-	}
+func NewServer(state *state.NodeState, initialPeer string) *Server {
+	server := &Server{State: state}
 	server.connectToInitialPeer(initialPeer)
 	return server
 }
@@ -106,30 +98,21 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[I] Recieved new transaction: %s\n", req.String())
 
-	if !req.TransactionIsValid() {
-		log.Print("[E] Transaction failed verification.\n")
-		respondWithError(w, http.StatusBadRequest, "Transaction failed verification.")
-		return
-	}
-
-	added := s.State.AddTransaction(req)
-	if !added {
+	err := s.State.AddTransaction(req)
+	if err != nil {
+		log.Printf("[Node] Block declined: %s", err.Error())
 		respondWithMessage(w, http.StatusAccepted, "Transaction already recived.")
 		return
 	}
 
-	if s.minerTx != nil {
-		s.minerTx <- req
-	}
+	// message, err := json.Marshal(req)
+	// if err != nil {
+	// 	log.Print("[E] Failed to marshal reqest for broadcast for some reason")
+	// 	respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
+	// 	return
+	// }
 
-	message, err := json.Marshal(req)
-	if err != nil {
-		log.Print("[E] Failed to marshal reqest for broadcast for some reason")
-		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
-		return
-	}
-
-	go s.broadcast("transaction", message)
+	go s.broadcast("transaction", []byte(r.Body.Close().Error()))
 
 	respondWithMessage(w, http.StatusAccepted, "Transaction accepted and broadcasted")
 }
@@ -142,51 +125,22 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	if !req.IsValid() {
-		respondWithError(w, http.StatusBadRequest, "Invalid block hash")
-		return
-	}
-
 	if err := s.State.AddBlock(req); err != nil {
+		log.Printf("[Node] Block declined: %s", err.Error())
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Block declined: %s.", err.Error()))
 		return
 	}
 
 	log.Printf("[I] Recieved new block %s\n", req.Hash[:10])
 
-	s.State.PoolLock.Lock()
-	data, err := req.ParseTransactions()
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Failed to parse transactions in block")
-		return
-	}
+	// message, err := req.SerializeWithoutHash()
+	// if err != nil {
+	// 	log.Print("[E] Failed to marshal reqest for broadcast for some reason")
+	// 	respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
+	// 	return
+	// }
 
-	// TODO: why this? fix it!
-	intersection := sliceIntersection(data, s.State.TransactionPool)
-	for i, item := range s.State.TransactionPool {
-		if slices.Contains(intersection, item) {
-			s.State.TransactionPool = slices.Delete(s.State.TransactionPool, i, i)
-		}
-	}
-	s.State.PoolLock.Unlock()
-
-	if s.minerReset != nil {
-		s.State.ChainLock.Lock()
-		s.minerReset <- bc.NetPayload{
-			Block:  req,
-			NewTsx: s.State.TransactionPool,
-		}
-		s.State.ChainLock.Unlock()
-	}
-
-	message, err := req.SerializeWithoutHash()
-	if err != nil {
-		log.Print("[E] Failed to marshal reqest for broadcast for some reason")
-		respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
-		return
-	}
-
-	go s.broadcast("block", message)
+	go s.broadcast("block", []byte(r.Body.Close().Error()))
 
 	respondWithMessage(w, http.StatusAccepted, "Block added to chain")
 }

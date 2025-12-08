@@ -24,6 +24,7 @@ func (b *Block) IsValid() bool {
 		log.Printf("Failed to mashal a block.")
 		return false
 	}
+	// TODO: check Transactions parsing
 	return hash(blockJson) == b.Hash
 }
 
@@ -63,6 +64,10 @@ func (b *Block) CreateHash() (string, error) {
 		return "", errors.New("Failed to mashal a block.")
 	}
 	return hash(blockJson), nil
+}
+
+func (b *Block) GetTransactions() ([]Transaction, error) {
+	return strToTrans(b.Transactions)
 }
 
 var Genesis = Block{

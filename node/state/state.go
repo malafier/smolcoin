@@ -32,23 +32,22 @@ type NodeState struct {
 	// Blockchain
 	Blockchain []bc.Block
 	Ledger     map[string]float32
-	ChainLock  sync.Mutex
-
-	// TransactionPool
-	TransactionPool []bc.Transaction
-	PoolLock        sync.Mutex
+	ChainLock  sync.RWMutex
 
 	// Peers
 	Peers     map[string]Peer
 	PeersLock sync.RWMutex
+
+	miner *bc.Miner
 }
 
-func NewNodeState(host string, port int) *NodeState {
+func NewNodeState(host string, port int, miner *bc.Miner) *NodeState {
 	node := &NodeState{
 		Host:       host,
 		Port:       port,
 		Blockchain: []bc.Block{bc.Genesis},
 		Peers:      make(map[string]Peer),
+		miner:      miner,
 	}
 	node.PeerHeader = make(http.Header)
 	node.PeerHeader.Set("Peer", node.Addr())
@@ -100,6 +99,10 @@ func (ns *NodeState) PeerCount() int {
 }
 
 func (ns *NodeState) AddBlock(block *bc.Block) error {
+	if !block.IsValid() {
+		return errors.New("Given block is not valid")
+	}
+
 	ns.ChainLock.Lock()
 	defer ns.ChainLock.Unlock()
 
@@ -110,38 +113,53 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	if lastBlock.Hash != block.PrevHash {
 		return errors.New("Hash mismatch")
 	}
-
 	prefix := strings.Repeat("0", ns.Difficulty)
 	if strings.HasPrefix(block.Hash, prefix) {
 		return errors.New("Prefix not long enough")
 	}
 
 	ns.Blockchain = append(ns.Blockchain, *block)
+
+	// Reseting miner
+	if ns.miner != nil {
+		mempool := ns.miner.GetMempoolAndStop()
+		txs, _ := block.GetTransactions()
+		var newMempool []bc.Transaction
+		for _, tx := range mempool {
+			if !slices.Contains(txs, tx) {
+				newMempool = append(newMempool, tx)
+			}
+		}
+
+		ns.miner.InReset <- bc.NetPayload{
+			Block:  block,
+			NewTsx: newMempool,
+		}
+	}
+
 	return nil
 }
 
-func (ns *NodeState) AddTransaction(transaction bc.Transaction) bool {
-	ns.PoolLock.Lock()
-	defer ns.PoolLock.Unlock()
-	if slices.Contains(ns.TransactionPool, transaction) {
-		return false
+func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
+	if !tx.TransactionIsValid() {
+		return errors.New("Transaction failed verification.")
 	}
 
-	ns.ChainLock.Lock()
-	defer ns.ChainLock.Unlock()
-	for _, block := range ns.Blockchain {
-		transactions, err := block.ParseTransactions()
-		if err != nil {
-			log.Panic("[F] Transactions in blockchain cannot be parsed")
-			return false
+	hash, err := tx.Hash()
+	if err != nil {
+		return errors.New("Something went wrong with transaction. Sorry")
+	}
+
+	if ns.miner != nil {
+		mempool := ns.miner.GetMempoolHashes()
+		if slices.Contains(mempool, hash) {
+			return errors.New("Already have this transaction in mempool")
 		}
 
-		if slices.Contains(transactions, transaction) {
-			return false
-		}
+		ns.miner.InTx <- tx
 	}
-	ns.TransactionPool = append(ns.TransactionPool, transaction)
-	return true
+
+	return nil
 }
 
 func (ns *NodeState) UpdateLedger() {
@@ -165,7 +183,7 @@ func (ns *NodeState) UpdateLedger() {
 }
 
 func (ns *NodeState) GetClients() []string {
-	ns.ChainLock.Lock()
+	ns.ChainLock.RLock()
 	defer ns.ChainLock.Unlock()
 
 	keys := []string{}
