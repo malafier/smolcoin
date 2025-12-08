@@ -35,6 +35,9 @@ class App:
         self.storage_path = storage_path
         self.node_adr: None | str = node_adr
 
+        self.chosen_id: KeyPair | None = None
+        self.coins: float | None = None
+
     def run(self):
         while True:
             if self._render():
@@ -44,23 +47,25 @@ class App:
         key_options = [(pair, pair[1]) for pair in self.keys]
         radio_options = [
             ("add", "Generate new pair"),
-            ("list", "List all pairs"),
+            ("list", "Chose identity"),
             ("delete", "Delete selected pairs"),
             ("connect", "Connect to node"),
             ("transaction", "Send transaction"),
             ("exit", "Exit"),
         ]
-        text = f"Connected to node: {self.node_adr}"
+        text = f"""Connected to node: {self.node_adr}
+Identity: {'Chose identity' if not self.chosen_id else view_key(self.chosen_id[PK])[:24] + '...'}
+Smolcoins: {'Chose identity' if not self.coins else self.coins}
+        """
         choice = radiolist_dialog(title="Wallet", text=text, values=radio_options).run()
 
         if choice == "add":
             self._add_new_keys()
 
         elif choice == "list":
-            displayed_text = ""
-            for pair in self.keys:
-                displayed_text += f"{pair[0]}\n{pair[1]}\n\n"
-            message_dialog(title="Keys", text=displayed_text).run()
+            self.chosen_id = radiolist_dialog(
+                title="Chose identity", values=key_options
+            ).run()
 
         elif choice == "delete":
             delete_choice = checkboxlist_dialog(
@@ -80,13 +85,17 @@ class App:
             if not self.node_adr:
                 message_dialog(title="Error", text="Node address is not set.").run()
                 return
-
-            maybe = self._render_tx(key_options)
-            if not maybe:
+            if not self.chosen_id:
+                message_dialog(title="Error", text="Identity is not chosen").run()
                 return
-            tx, key = maybe
+
+            tx = self._render_tx()
+            if not tx:
+                return
             tx_str = json.dumps(tx, sort_keys=True)
-            signature_str = base64.b64encode(sign_message(key, tx_str)).decode("utf-8")
+            signature_str = base64.b64encode(
+                sign_message(self.chosen_id[SK], tx_str)
+            ).decode("utf-8")
             send_transaction(
                 self.node_adr,
                 TransactionMessage(tx_str, signature_str, tx.sender),
@@ -95,35 +104,29 @@ class App:
         elif choice == "exit":
             return "EXIT"
 
-    def _render_tx(
-        self, key_options: list[tuple[KeyPair, str]]
-    ) -> None | tuple[Transaction, str]:
+    def _render_tx(self) -> None | Transaction:
         assert isinstance(self.node_adr, str)
+        assert self.chosen_id is not None
+
         tx = Transaction()
         tx.difficulty = 5
-        key_chosen = None
+        tx.sender = self.chosen_id[PK]
 
         while True:
             transaction_options = [
-                (
-                    "sender",
-                    f"Sender: {key_chosen if not key_chosen else view_key(key_chosen[PK])[:16] + '...'}",
-                ),
                 ("reciever", f"Reciever: {tx.reciever}"),
                 ("ammount", f"Ammount: {tx.ammount}"),
                 ("difficulty", f"Difficulty: {tx.difficulty}"),
                 ("send", "Send"),
                 ("cancel", "Cancel transaction"),
             ]
-
             tx_choice = radiolist_dialog(
-                title="New Transaction", values=transaction_options
+                title="New Transaction",
+                values=transaction_options,
+                text=f"Sender: {view_key(self.chosen_id[PK])[:24] + '...'}",
             ).run()
-            if tx_choice == "sender":
-                key_chosen = radiolist_dialog(
-                    title="Chose identity", values=key_options
-                ).run()
-            elif tx_choice == "reciever":
+
+            if tx_choice == "reciever":
                 reciever_choice = get_possible_pubs(self.node_adr)
                 tx.reciever = radiolist_dialog(
                     title="Chose reciever",
@@ -137,11 +140,7 @@ class App:
                 break
             elif tx_choice == "cancel":
                 return
-
-        if not key_chosen:
-            return
-        tx.sender = key_chosen[PK]
-        return tx, key_chosen[SK]
+        return tx
 
     def _save_keys(self):
         data = []
