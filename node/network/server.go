@@ -124,7 +124,7 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go s.broadcastMessage("transaction", message)
+	go s.broadcast("transaction", message)
 
 	respondWithMessage(w, http.StatusAccepted, "Transaction accepted and broadcasted")
 }
@@ -164,7 +164,12 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	s.State.PoolLock.Unlock()
 
 	if s.minerReset != nil {
-		s.minerReset <- bc.NetPayload{}
+		s.State.ChainLock.Lock()
+		s.minerReset <- bc.NetPayload{
+			Block:  req,
+			NewTsx: s.State.TransactionPool,
+		}
+		s.State.ChainLock.Unlock()
 	}
 
 	message, err := req.SerializeWithoutHash()
@@ -174,12 +179,12 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go s.broadcastMessage("block", message)
+	go s.broadcast("block", message)
 
 	respondWithMessage(w, http.StatusAccepted, "Block added to chain")
 }
 
-func (s *Server) broadcastMessage(uri string, payload []byte) {
+func (s *Server) broadcast(uri string, payload []byte) {
 	peerList := s.State.PeersList()
 	log.Printf("[I] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload))
 
@@ -188,14 +193,14 @@ func (s *Server) broadcastMessage(uri string, payload []byte) {
 		wg.Add(1)
 		go func(p state.Peer) {
 			defer wg.Done()
-			s.sendMessageToPeer(p, uri, payload)
+			s.sendReqToPeer(p, uri, payload)
 		}(peer)
 	}
 	wg.Wait()
 	log.Println("[I] Broadcast finished.")
 }
 
-func (s *Server) sendMessageToPeer(peer state.Peer, uri string, payload []byte) {
+func (s *Server) sendReqToPeer(peer state.Peer, uri string, payload []byte) {
 	url := fmt.Sprintf("http://%s/%s", peer.Addr(), uri)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
