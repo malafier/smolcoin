@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -103,14 +104,14 @@ func (m *Miner) ListenAndMine() {
 	}
 }
 
-func (m *Miner) GetMempoolHashes() []string {
+func (m *Miner) MempoolContains(txHash string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	hashes := make([]string, len(m.mempool))
 	for i, tx := range m.mempool {
 		hashes[i], _ = tx.Hash() // This ignores possible error, becouse transaction should be checked muliple times at this point
 	}
-	return hashes
+	return slices.Contains(hashes, txHash)
 }
 
 func (m *Miner) GetMempoolAndStop() []Transaction {

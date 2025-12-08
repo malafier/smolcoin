@@ -151,8 +151,8 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 	}
 
 	if ns.miner != nil {
-		mempool := ns.miner.GetMempoolHashes()
-		if slices.Contains(mempool, hash) {
+		contains := ns.miner.MempoolContains(hash)
+		if contains {
 			return errors.New("Already have this transaction in mempool")
 		}
 
