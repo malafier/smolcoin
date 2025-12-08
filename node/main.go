@@ -18,7 +18,7 @@ func main() {
 	var miner *bc.Miner
 	if *mine {
 		miner = bc.NewMiner(bc.DEFAULT_DIFFICULTY)
-		miner.ListenAndMine()
+		go miner.ListenAndMine()
 	}
 
 	state := NewNodeState(*host, *port, miner)
