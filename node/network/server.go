@@ -155,6 +155,8 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusBadRequest, "Failed to parse transactions in block")
 		return
 	}
+
+	// TODO: why this? fix it!
 	intersection := sliceIntersection(data, s.State.TransactionPool)
 	for i, item := range s.State.TransactionPool {
 		if slices.Contains(intersection, item) {
@@ -249,6 +251,7 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	}
 }
 
+// TODO: make this non blocking
 func (s *Server) StartServer() {
 	router := http.NewServeMux()
 

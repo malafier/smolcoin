@@ -21,6 +21,8 @@ func (p *Peer) Addr() string {
 	return fmt.Sprintf("%s:%d", p.Host, p.Port)
 }
 
+// TODO: should be defided by smaller structs
+// also write interface for new block and mempool changes
 type NodeState struct {
 	Host       string
 	Port       int
