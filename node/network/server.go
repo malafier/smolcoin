@@ -131,7 +131,7 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[I] Recieved new block %s\n", req.Hash[:10])
+	log.Printf("[Node] Recieved new block %s\n", req.Hash[:10])
 
 	// message, err := req.SerializeWithoutHash()
 	// if err != nil {
@@ -147,7 +147,7 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) broadcast(uri string, payload []byte) {
 	peerList := s.State.PeersList()
-	log.Printf("[I] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload))
+	log.Printf("[Node] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload))
 
 	var wg sync.WaitGroup
 	for _, peer := range peerList {
@@ -158,7 +158,7 @@ func (s *Server) broadcast(uri string, payload []byte) {
 		}(peer)
 	}
 	wg.Wait()
-	log.Println("[I] Broadcast finished.")
+	log.Println("[Node] Broadcast finished.")
 }
 
 func (s *Server) sendReqToPeer(peer state.Peer, uri string, payload []byte) {
@@ -204,7 +204,7 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	client := http.Client{Timeout: 5 * time.Second}
 	if _, err := client.Do(req); err == nil {
 		s.State.AddPeer(host, port)
-		log.Printf("[I] Successfully connected to initial peer %s\n", initialPeer)
+		log.Printf("[Node] Successfully connected to initial peer %s\n", initialPeer)
 	} else {
 		log.Printf("[E] Failed to connect to %s. Error: %v\n", initialPeer, err)
 	}
@@ -224,7 +224,7 @@ func (s *Server) Start() {
 	handlerWithMiddleware := s.checkHeaders(router)
 
 	serverAddr := s.State.Addr()
-	log.Printf("[I] Starting s.State on http://%s\n", serverAddr)
+	log.Printf("[Node] Starting node on http://%s\n", serverAddr)
 	if err := http.ListenAndServe(serverAddr, handlerWithMiddleware); err != nil {
 		log.Fatalf("[F] Failed to start server: %v\n", err)
 	}
