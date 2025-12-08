@@ -1,95 +1,78 @@
 package blockchain
 
 import (
-	"context"
+	"fmt"
 	"log"
-	"slices"
 	"strings"
-	"sync"
 	"time"
 )
 
 const DEFAULT_DIFFICULTY int = 5
 
+type NetPayload struct {
+	Block  *Block
+	NewTsx []Transaction
+}
+
 type Miner struct {
-	Mempool      []Transaction
-	PrevBlock    *Block
-	IsMining     bool
-	Difficulty   int
-	cancelMining context.CancelFunc
-	Mutex        sync.Mutex
+	InTx     chan Transaction
+	InReset  chan NetPayload
+	OutBlock chan Block
+
+	Mempool    []Transaction
+	prevBlock  *Block
+	Difficulty int
 }
 
 func NewMiner(difficlty int) *Miner {
 	return &Miner{
-		Difficulty: difficlty,
+		InTx:       make(chan Transaction),
+		InReset:    make(chan NetPayload),
+		OutBlock:   make(chan Block),
 		Mempool:    []Transaction{},
-		PrevBlock:  &Genesis,
-		IsMining:   false,
+		Difficulty: difficlty,
 	}
 }
 
-func (m *Miner) AddTransaction(transaction Transaction) bool {
-	m.Mutex.Lock()
-	defer m.Mutex.Unlock()
-	if slices.Contains(m.Mempool, transaction) {
-		return false
-	}
-	m.Mempool = append(m.Mempool, transaction)
-	return true
-}
-
-func (m *Miner) StopMining() {
-	m.Mutex.Lock()
-	defer m.Mutex.Unlock()
-	if m.IsMining {
-		m.IsMining = false
-		m.cancelMining()
-	}
-}
-
-func (m *Miner) Mine() *Block {
-	m.Mutex.Lock()
-	defer m.Mutex.Unlock()
-	if len(m.Mempool) == 0 {
-		m.IsMining = false
-		log.Printf("Nothing to mine.")
-		return nil
-	}
-
-	var ctx context.Context
-	ctx, m.cancelMining = context.WithCancel(context.Background())
-
-	block, err := m.miningLoop(ctx)
-	if err != nil {
-		log.Printf("%s\n", err.Error())
-	}
-
-	return block
-}
-
-func (m *Miner) miningLoop(ctx context.Context) (*Block, error) {
+func (m *Miner) ListenAndMine() {
 	prefix := strings.Repeat("0", m.Difficulty)
+
+	fmt.Println("[Miner] Started mining...")
+
+	for {
+		select {
+		case newTx := <-m.InTx:
+			fmt.Println("[Miner] New transaction recieved")
+			m.Mempool = append(m.Mempool, newTx)
+		case payload := <-m.InReset:
+			m.prevBlock = payload.Block
+			m.Mempool = payload.NewTsx
+		default:
+			if len(m.Mempool) == 0 {
+				time.Sleep(100 * time.Microsecond)
+				continue
+			}
+
+			m.miningLoop(prefix)
+		}
+	}
+}
+
+func (m *Miner) miningLoop(prefix string) (*Block, error) {
 	transactions, err := transToStr(m.Mempool)
 	if err != nil {
 		return nil, err
 	}
 
 	block := &Block{
-		Index:        m.PrevBlock.Index + 1,
-		PrevHash:     m.PrevBlock.Hash,
+		Index:        m.prevBlock.Index + 1,
+		PrevHash:     m.prevBlock.PrevHash,
 		Transactions: transactions,
 		Timestamp:    time.Now().Unix(),
 		Nonce:        0,
 	}
 
 	for {
-		select {
-		case <-ctx.Done():
-			return nil, nil
-		default:
-		}
-
 		blockJson, err := block.SerializeWithoutHash()
 		if err != nil {
 			log.Printf("Failed to marshal a block.")

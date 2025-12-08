@@ -5,51 +5,53 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
 	bc "node/blockchain"
+	state "node/state"
 )
 
 type Server struct {
-	State *NodeState
-	Miner *bc.Miner
+	State      *state.NodeState
+	minerTx    chan<- bc.Transaction
+	minerReset chan<- bc.NetPayload
 }
 
-func NewServer(state *NodeState, initialPeer string, ifMiner bool, difficulty int) *Server {
-	var miner *bc.Miner
-	if ifMiner {
-		miner = bc.NewMiner(difficulty)
-	}
-	server := &Server{State: state, Miner: miner}
+func NewServer(state *state.NodeState, minerTx chan<- bc.Transaction, minerReset chan<- bc.NetPayload, initialPeer string) *Server {
+	server := &Server{State: state, minerTx: minerTx, minerReset: minerReset}
 	server.connectToInitialPeer(initialPeer)
 	return server
 }
 
-func (s *Server) checkPeerHeader(next http.Handler) http.Handler {
+func (s *Server) checkHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peerInfo := r.Header.Get("Peer")
-		if s.State.PeerCount() > 3 || peerInfo == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
+		clientInfo := r.Header.Get("Client")
 
-		host, portStr, err := net.SplitHostPort(peerInfo)
-		if err != nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			next.ServeHTTP(w, r)
-			return
-		}
+		switch {
+		case peerInfo != "":
+			if s.State.PeerCount() > 3 {
+				next.ServeHTTP(w, r)
+				return
+			}
 
-		s.State.AddPeer(host, port)
+			host, port, err := parsePeer(peerInfo)
+			if err != nil {
+				http.Error(w, "Wrong peer address", http.StatusBadRequest)
+				return
+			}
+			s.State.AddPeer(host, port)
+
+		case clientInfo != "":
+			// TODO: handle client pub key
+
+		default:
+			http.Error(w, "Request must contain at least one valid header", http.StatusBadRequest)
+			return
+		}
 
 		next.ServeHTTP(w, r)
 	})
@@ -60,8 +62,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Node running on %s", s.State.Addr())
 }
 
-func (s *Server) handleGetIds(w http.ResponseWriter, r *http.Request) {
-	respondWithJSON(w, http.StatusOK, map[string][]string{"ids": s.State.GetIds()})
+func (s *Server) handleGetClients(w http.ResponseWriter, r *http.Request) {
+	respondWithJSON(w, http.StatusOK, map[string][]string{"clients": s.State.GetClients()})
 }
 
 func (s *Server) handleAddPeer(w http.ResponseWriter, r *http.Request) {
@@ -111,12 +113,8 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.Miner != nil && !s.Miner.IsMining {
-		added := s.Miner.AddTransaction(req)
-		if !added {
-			respondWithMessage(w, http.StatusAccepted, "Transaction already recived.")
-			return
-		}
+	if s.minerTx != nil {
+		s.minerTx <- req
 	}
 
 	message, err := json.Marshal(req)
@@ -127,9 +125,6 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go s.broadcastMessage("transaction", message)
-	if s.Miner != nil && !s.Miner.IsMining {
-		go s.Miner.Mine()
-	}
 
 	respondWithMessage(w, http.StatusAccepted, "Transaction accepted and broadcasted")
 }
@@ -168,14 +163,8 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	}
 	s.State.PoolLock.Unlock()
 
-	if s.Miner != nil {
-		s.Miner.StopMining()
-
-		s.Miner.Mutex.Lock()
-		s.Miner.PrevBlock = req
-		s.Miner.Mempool = s.State.TransactionPool
-		s.Miner.Mutex.Unlock()
-		go s.Miner.Mine()
+	if s.minerReset != nil {
+		s.minerReset <- bc.NetPayload{}
 	}
 
 	message, err := req.SerializeWithoutHash()
@@ -197,7 +186,7 @@ func (s *Server) broadcastMessage(uri string, payload []byte) {
 	var wg sync.WaitGroup
 	for _, peer := range peerList {
 		wg.Add(1)
-		go func(p Peer) {
+		go func(p state.Peer) {
 			defer wg.Done()
 			s.sendMessageToPeer(p, uri, payload)
 		}(peer)
@@ -206,7 +195,7 @@ func (s *Server) broadcastMessage(uri string, payload []byte) {
 	log.Println("[I] Broadcast finished.")
 }
 
-func (s *Server) sendMessageToPeer(peer Peer, uri string, payload []byte) {
+func (s *Server) sendMessageToPeer(peer state.Peer, uri string, payload []byte) {
 	url := fmt.Sprintf("http://%s/%s", peer.Addr(), uri)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
@@ -237,14 +226,9 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	if initialPeer == "" {
 		return
 	}
-	host, portStr, err := net.SplitHostPort(initialPeer)
+	host, port, err := parsePeer(initialPeer)
 	if err != nil {
 		log.Printf("[E] Invalid initial peer address: %v\n", err)
-		return
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		log.Printf("[E] Invalid initial peer port: %v\n", err)
 		return
 	}
 
@@ -264,13 +248,13 @@ func (s *Server) StartServer() {
 	router := http.NewServeMux()
 
 	router.HandleFunc("GET /", s.handleIndex)
-	router.HandleFunc("GET /users", s.handleGetIds)
+	router.HandleFunc("GET /users", s.handleGetClients)
 	router.HandleFunc("GET /peers", s.handleGetPeers)
 	router.HandleFunc("POST /peer", s.handleAddPeer)
 	router.HandleFunc("POST /block", s.handleNewBlock)
 	router.HandleFunc("POST /transaction", s.handleNewTransaction)
 
-	handlerWithMiddleware := s.checkPeerHeader(router)
+	handlerWithMiddleware := s.checkHeaders(router)
 
 	serverAddr := s.State.Addr()
 	log.Printf("[I] Starting s.State on http://%s\n", serverAddr)

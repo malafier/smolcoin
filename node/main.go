@@ -5,6 +5,7 @@ import (
 
 	bc "node/blockchain"
 	. "node/network"
+	. "node/state"
 )
 
 func main() {
@@ -14,6 +15,14 @@ func main() {
 	mine := flag.Bool("M", false, "Flag if node is a miner")
 	flag.Parse()
 
-	server := NewServer(NewNodeState(*host, *port), *peer, *mine, bc.DEFAULT_DIFFICULTY)
+	var miner *bc.Miner
+	if *mine {
+		miner = bc.NewMiner(bc.DEFAULT_DIFFICULTY)
+		miner.ListenAndMine()
+	}
+
+	state := NewNodeState(*host, *port)
+
+	server := NewServer(state, miner.InTx, miner.InReset, *peer)
 	server.StartServer()
 }

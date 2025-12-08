@@ -1,4 +1,4 @@
-package network
+package state
 
 import (
 	"errors"
@@ -162,7 +162,7 @@ func (ns *NodeState) UpdateLedger() {
 	ns.Ledger = ledger
 }
 
-func (ns *NodeState) GetIds() []string {
+func (ns *NodeState) GetClients() []string {
 	ns.ChainLock.Lock()
 	defer ns.ChainLock.Unlock()
 
