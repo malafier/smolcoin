@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -17,73 +16,91 @@ type NetPayload struct {
 type Miner struct {
 	InTx     chan Transaction
 	InReset  chan NetPayload
-	OutBlock chan Block
+	OutBlock chan *Block
 
-	Mempool    []Transaction
+	mempool    []Transaction
 	prevBlock  *Block
-	Difficulty int
+	difficulty int
 }
 
 func NewMiner(difficlty int) *Miner {
 	return &Miner{
 		InTx:       make(chan Transaction),
 		InReset:    make(chan NetPayload),
-		OutBlock:   make(chan Block),
-		Mempool:    []Transaction{},
-		Difficulty: difficlty,
+		OutBlock:   make(chan *Block),
+		mempool:    []Transaction{},
+		difficulty: difficlty,
 	}
 }
 
 func (m *Miner) ListenAndMine() {
-	prefix := strings.Repeat("0", m.Difficulty)
-
-	fmt.Println("[Miner] Started mining...")
-
-	for {
-		select {
-		case newTx := <-m.InTx:
-			fmt.Println("[Miner] New transaction recieved")
-			m.Mempool = append(m.Mempool, newTx)
-		case payload := <-m.InReset:
-			m.prevBlock = payload.Block
-			m.Mempool = payload.NewTsx
-		default:
-			if len(m.Mempool) == 0 {
-				time.Sleep(100 * time.Microsecond)
-				continue
-			}
-
-			m.miningLoop(prefix)
-		}
-	}
-}
-
-func (m *Miner) miningLoop(prefix string) (*Block, error) {
-	transactions, err := transToStr(m.Mempool)
-	if err != nil {
-		return nil, err
-	}
+	prefix := strings.Repeat("0", m.difficulty)
+	log.Println("[Miner] Started mining...")
 
 	block := &Block{
-		Index:        m.prevBlock.Index + 1,
-		PrevHash:     m.prevBlock.PrevHash,
-		Transactions: transactions,
+		Index:        0,
+		PrevHash:     "",
+		Transactions: "",
 		Timestamp:    time.Now().Unix(),
 		Nonce:        0,
 	}
 
+	// Mining loop
 	for {
-		blockJson, err := block.SerializeWithoutHash()
-		if err != nil {
-			log.Printf("Failed to marshal a block.")
-			continue
-		}
+		select {
+		// New transaction
+		case newTx := <-m.InTx:
+			log.Println("[Miner] New transaction recieved")
+			m.mempool = append(m.mempool, newTx)
 
-		blockHash := hash(blockJson)
-		if strings.HasPrefix(blockHash, prefix) {
-			block.Hash = blockHash
-			return block, nil
+			var err error
+			block.Transactions, err = transToStr(m.mempool)
+			if err != nil {
+				log.Fatal("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
+			}
+			block.Timestamp = time.Now().Unix()
+			block.Nonce = 0
+
+		// New block added, block is reseting
+		case payload := <-m.InReset:
+			log.Println("[Miner] New transaction recieved")
+			m.prevBlock = payload.Block
+			m.mempool = payload.NewTsx
+
+			var err error
+			block.Transactions, err = transToStr(m.mempool)
+			if err != nil {
+				log.Fatal("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
+			}
+			block.Timestamp = time.Now().Unix()
+			block.PrevHash = m.prevBlock.Hash
+			block.Index = m.prevBlock.Index
+			block.Nonce = 0
+
+		// Mining
+		default:
+			if len(m.mempool) == 0 || len(block.Transactions) == 0 {
+				time.Sleep(100 * time.Microsecond)
+				continue
+			}
+
+			blockJson, err := block.SerializeWithoutHash()
+			if err != nil {
+				log.Fatal("[Miner] Marshaling block failed misreably. Miner cannot run anymore")
+			}
+
+			blockHash := hash(blockJson)
+			if strings.HasPrefix(blockHash, prefix) {
+				block.Hash = blockHash
+
+				log.Printf("\nNew Block mined\nId: %d Hash: %s\n\n", block.Index, block.Hash[:10])
+				m.mempool = m.mempool[:0]
+				m.prevBlock = block
+				m.OutBlock <- block
+				block = &Block{}
+			}
+			block.Nonce++
+
 		}
-		block.Nonce++
 	}
 }
