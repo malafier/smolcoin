@@ -19,12 +19,19 @@ func (b *Block) IsValid() bool {
 	if b.Hash != "" {
 		return false
 	}
+
 	blockJson, err := b.SerializeWithoutHash()
 	if err != nil {
 		log.Printf("Failed to mashal a block.")
 		return false
 	}
-	// TODO: check Transactions parsing
+
+	_, err = strToTrans(b.Transactions)
+	if err != nil {
+		log.Printf("Failed to parse transactions")
+		return false
+	}
+
 	return hash(blockJson) == b.Hash
 }
 
