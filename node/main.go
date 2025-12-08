@@ -23,7 +23,6 @@ func main() {
 
 	state := NewNodeState(*host, *port)
 
-	server := NewServer(state, miner.InTx, miner.InReset, *peer)
-	server.StartServer()
-	// TODO: this ^ shold be not blocking and rest should be run by the miner
+	server := NewServer(state, miner, *peer)
+	server.Start()
 }

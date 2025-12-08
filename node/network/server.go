@@ -20,8 +20,13 @@ type Server struct {
 	minerReset chan<- bc.NetPayload
 }
 
-func NewServer(state *state.NodeState, minerTx chan<- bc.Transaction, minerReset chan<- bc.NetPayload, initialPeer string) *Server {
-	server := &Server{State: state, minerTx: minerTx, minerReset: minerReset}
+func NewServer(state *state.NodeState, miner *bc.Miner, initialPeer string) *Server {
+	var server *Server
+	if miner != nil {
+		server = &Server{State: state, minerTx: miner.InTx, minerReset: miner.InReset}
+	} else {
+		server = &Server{State: state, minerTx: nil, minerReset: nil}
+	}
 	server.connectToInitialPeer(initialPeer)
 	return server
 }
@@ -252,7 +257,7 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 }
 
 // TODO: make this non blocking
-func (s *Server) StartServer() {
+func (s *Server) Start() {
 	router := http.NewServeMux()
 
 	router.HandleFunc("GET /", s.handleIndex)
