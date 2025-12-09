@@ -96,9 +96,17 @@ func (t *Transaction) TransactionIsValid() bool {
 		return false
 	}
 
-	serializedData, _ := t.SerializeWithoutSign()
+	serializedData, err := t.SerializeWithoutSign()
+	if err != nil {
+		log.Printf("[I] Serializarion not good")
+		return false
+	}
 	hashedData := sha256.Sum256(serializedData)
-	return ecdsa.VerifyASN1(publicKey, hashedData[:], signature)
+	valid := ecdsa.VerifyASN1(publicKey, hashedData[:], signature)
+	if !valid {
+		log.Printf("[I] Validation not good")
+	}
+	return valid
 }
 
 func pemToPublicKey(pemKey string) (*ecdsa.PublicKey, error) {
