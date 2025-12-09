@@ -103,8 +103,8 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 
 	err := s.State.AddTransaction(req)
 	if err != nil {
-		log.Printf("[Node] Block declined: %s", err.Error())
-		respondWithMessage(w, http.StatusAccepted, "Transaction already recived.")
+		log.Printf("[Node] Transaction declined: %s", err.Error())
+		respondWithMessage(w, http.StatusAccepted, err.Error())
 		return
 	}
 

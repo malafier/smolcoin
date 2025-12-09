@@ -31,6 +31,7 @@ type NodeState struct {
 	Blockchain []bc.Block
 	Ledger     map[string]float32
 	ChainLock  sync.RWMutex
+	txHistory  []string
 
 	// Peers
 	Peers     map[string]Peer
@@ -148,6 +149,9 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 	hash, err := tx.Hash()
 	if err != nil {
 		return errors.New("Something went wrong with transaction. Sorry")
+	}
+	if slices.Contains(ns.txHistory, hash) {
+		return errors.New("Transaction already registered")
 	}
 
 	if ns.miner != nil {
