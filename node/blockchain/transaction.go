@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -90,21 +88,15 @@ func (t *Transaction) TransactionIsValid() bool {
 		return false
 	}
 
-	signature, err := base64.StdEncoding.DecodeString(t.Signature)
-	if err != nil {
-		log.Printf("[E] %s\n", err)
-		return false
-	}
-
 	serializedData, err := t.SerializeWithoutSign()
 	if err != nil {
 		log.Printf("[I] Serializarion not good")
 		return false
 	}
-	hashedData := sha256.Sum256(serializedData)
-	valid := ecdsa.VerifyASN1(publicKey, hashedData[:], signature)
+	hashedData := hash(serializedData)
+	valid := ecdsa.VerifyASN1(publicKey, []byte(hashedData), []byte(t.Signature))
 	if !valid {
-		log.Printf("[I] Validation not good")
+		log.Printf("[I] Validation not good\npk: %s\nh: %s\ns: %s\ntxt: %s", t.Sender, hashedData, t.Signature, string(serializedData))
 	}
 	return valid
 }
