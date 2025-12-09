@@ -11,7 +11,6 @@ class Transaction:
     reciever: str
     ammount: float
     timestamp: int
-    difficulty: int
     signature: str
 
     def __init__(self) -> None:
@@ -19,7 +18,6 @@ class Transaction:
         self.reciever = ""
         self.ammount = 0.0
         self.timestamp = 0
-        self.difficulty = 0
 
     def sign(self, sk: str):
         tx = {
@@ -27,7 +25,6 @@ class Transaction:
             "reciever": self.reciever,
             "ammount": self.ammount,
             "timestamp": self.timestamp,
-            "difficulty": self.difficulty,
         }
         tx_str = json.dumps(tx, sort_keys=True)
         self.signature = sign(sk, tx_str).hex()

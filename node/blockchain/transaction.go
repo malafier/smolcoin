@@ -20,22 +20,20 @@ const COINBASE_SK string = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgE
 const COINBASE_PK string = "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEn0/9SFFVuOmouDsO4rGMz0MGvVX9\nlA7HhrkeAngzEjv24WBqfsFc+dV3XBncKEfMqX+pfKPIFlBe5RcvDN+4PQ==\n-----END PUBLIC KEY-----\n"
 
 type Transaction struct {
-	Sender     string  `json:"sender"`
-	Reciever   string  `json:"reciever"`
-	Ammount    float32 `json:"ammount"`
-	Timestamp  int     `json:"timestamp"`
-	Difficulty int     `json:"difficulty"`
-	Signature  string  `json:"signature"`
+	Sender    string  `json:"sender"`
+	Reciever  string  `json:"reciever"`
+	Ammount   float32 `json:"ammount"`
+	Timestamp int     `json:"timestamp"`
+	Signature string  `json:"signature"`
 }
 
 // TODO: dodać walidaje, tak aby nie można było dodawać coinbase w nieskończoność
 func Coinbase(reciever string) Transaction {
 	coinbase := Transaction{
-		Sender:     COINBASE_PK,
-		Reciever:   reciever,
-		Ammount:    10.0,
-		Difficulty: DEFAULT_DIFFICULTY,
-		Timestamp:  int(time.Now().Unix()),
+		Sender:    COINBASE_PK,
+		Reciever:  reciever,
+		Ammount:   10.0,
+		Timestamp: int(time.Now().Unix()),
 	}
 	hashed, _ := coinbase.Hash()
 	privKey, _ := pemToPrivateKey(COINBASE_SK)
@@ -56,11 +54,10 @@ func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 		Timestamp  int     `json:"timestamp"`
 		Difficulty int     `json:"difficulty"`
 	}{
-		Sender:     t.Sender,
-		Reciever:   t.Reciever,
-		Ammount:    t.Ammount,
-		Timestamp:  t.Timestamp,
-		Difficulty: t.Difficulty,
+		Sender:    t.Sender,
+		Reciever:  t.Reciever,
+		Ammount:   t.Ammount,
+		Timestamp: t.Timestamp,
 	}
 	return json.Marshal(data)
 }

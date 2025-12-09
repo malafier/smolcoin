@@ -106,14 +106,12 @@ Smolcoins: {'No info' if self.coins is None else self.coins}
         assert self.chosen_id is not None
 
         tx = Transaction()
-        tx.difficulty = 5
         tx.sender = self.chosen_id[PK]
 
         while True:
             transaction_options = [
                 ("reciever", f"Reciever: {'...' + view_key(tx.reciever)[-24:]}"),
                 ("ammount", f"Ammount: {tx.ammount}"),
-                ("difficulty", f"Difficulty: {tx.difficulty}"),
                 ("send", "Send"),
                 ("cancel", "Cancel transaction"),
             ]
@@ -131,8 +129,6 @@ Smolcoins: {'No info' if self.coins is None else self.coins}
                 ).run()
             elif tx_choice == "ammount":
                 tx.ammount = float(input_dialog(text="Set ammount").run())
-            elif tx_choice == "difficulty":
-                tx.difficulty = int(input_dialog(text="Set difficulty").run())
             elif tx_choice == "send":
                 break
             elif tx_choice == "cancel":
