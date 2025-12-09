@@ -1,4 +1,3 @@
-import base64
 import json
 
 import requests
@@ -9,10 +8,10 @@ from prompt_toolkit.shortcuts import (
     radiolist_dialog,
 )
 
-from src.crypto import encrypt_data, generate_keys, sign_message
-from src.network import get_possible_pubs, send_transaction
+from src.crypto import encrypt_data, generate_keys
+from src.network import get_ledger, get_possible_ids, send_transaction
 from src.storage import save_to_file
-from src.transactions import Transaction, TransactionMessage
+from src.transactions import Transaction
 
 type KeyPair = tuple[str, str]
 PK = 1
@@ -40,6 +39,7 @@ class App:
 
     def run(self):
         while True:
+            self._update_coins()
             if self._render():
                 break
 
@@ -55,7 +55,7 @@ class App:
         ]
         text = f"""Connected to node: {self.node_adr}
 Identity: {'Chose identity' if not self.chosen_id else view_key(self.chosen_id[PK])[:24] + '...'}
-Smolcoins: {'Chose identity' if not self.coins else self.coins}
+Smolcoins: {'No info' if not self.coins else self.coins}
         """
         choice = radiolist_dialog(title="Wallet", text=text, values=radio_options).run()
 
@@ -92,14 +92,8 @@ Smolcoins: {'Chose identity' if not self.coins else self.coins}
             tx = self._render_tx()
             if not tx:
                 return
-            tx_str = json.dumps(tx, sort_keys=True)
-            signature_str = base64.b64encode(
-                sign_message(self.chosen_id[SK], tx_str)
-            ).decode("utf-8")
-            send_transaction(
-                self.node_adr,
-                TransactionMessage(tx_str, signature_str, tx.sender),
-            )
+            tx.sign(self.chosen_id[SK])
+            send_transaction(self.node_adr, tx)
 
         elif choice == "exit":
             return "EXIT"
@@ -127,7 +121,7 @@ Smolcoins: {'Chose identity' if not self.coins else self.coins}
             ).run()
 
             if tx_choice == "reciever":
-                reciever_choice = get_possible_pubs(self.node_adr)
+                reciever_choice = get_possible_ids(self.node_adr)
                 tx.reciever = radiolist_dialog(
                     title="Chose reciever",
                     values=[(x, x) for x in reciever_choice],
@@ -157,3 +151,12 @@ Smolcoins: {'Chose identity' if not self.coins else self.coins}
     def _delete_key(self, pair: tuple[str, str]):
         self.keys.remove(pair)
         self._save_keys()
+
+    def _update_coins(self):
+        if not self.chosen_id or not self.node_adr:
+            return
+        ledger = get_ledger(self.node_adr)
+        if not ledger:
+            return
+        if self.chosen_id[PK] in ledger:
+            self.coins = ledger[self.chosen_id[PK]]

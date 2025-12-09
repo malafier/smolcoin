@@ -73,7 +73,7 @@ def decrypt_data(password: str, encoded_data: dict) -> str:
     return plain_text.decode("utf-8")
 
 
-def sign_message(private_key_pem: str, message: str) -> bytes:
+def sign(private_key_pem: str, message: str) -> bytes:
     private_key = serialization.load_pem_private_key(
         private_key_pem.encode("utf-8"),
         password=None,
