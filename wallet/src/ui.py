@@ -54,8 +54,8 @@ class App:
             ("exit", "Exit"),
         ]
         text = f"""Connected to node: {self.node_adr}
-Identity: {'Chose identity' if not self.chosen_id else view_key(self.chosen_id[PK])[:24] + '...'}
-Smolcoins: {'No info' if not self.coins else self.coins}
+Identity: {'Chose identity' if not self.chosen_id else '...'+ view_key(self.chosen_id[PK])[-24:]}
+Smolcoins: {'No info' if self.coins is None else self.coins}
         """
         choice = radiolist_dialog(title="Wallet", text=text, values=radio_options).run()
 
@@ -63,6 +63,8 @@ Smolcoins: {'No info' if not self.coins else self.coins}
             self._add_new_keys()
 
         elif choice == "list":
+            if len(key_options) == 0:
+                return
             self.chosen_id = radiolist_dialog(
                 title="Chose identity", values=key_options
             ).run()
@@ -108,7 +110,7 @@ Smolcoins: {'No info' if not self.coins else self.coins}
 
         while True:
             transaction_options = [
-                ("reciever", f"Reciever: {tx.reciever}"),
+                ("reciever", f"Reciever: {'...' + view_key(tx.reciever)[-24:]}"),
                 ("ammount", f"Ammount: {tx.ammount}"),
                 ("difficulty", f"Difficulty: {tx.difficulty}"),
                 ("send", "Send"),
@@ -117,7 +119,7 @@ Smolcoins: {'No info' if not self.coins else self.coins}
             tx_choice = radiolist_dialog(
                 title="New Transaction",
                 values=transaction_options,
-                text=f"Sender: {view_key(self.chosen_id[PK])[:24] + '...'}",
+                text=f"Sender: {  '...'+view_key(self.chosen_id[PK])[-24:]}",
             ).run()
 
             if tx_choice == "reciever":
@@ -155,8 +157,7 @@ Smolcoins: {'No info' if not self.coins else self.coins}
     def _update_coins(self):
         if not self.chosen_id or not self.node_adr:
             return
-        ledger = get_ledger(self.node_adr)
-        if not ledger:
+        ledger = get_ledger(self.node_adr, self.chosen_id[PK])
+        if ledger is None:
             return
-        if self.chosen_id[PK] in ledger:
-            self.coins = ledger[self.chosen_id[PK]]
+        self.coins = float(ledger[self.chosen_id[PK]])

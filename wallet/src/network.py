@@ -1,5 +1,4 @@
 import dataclasses
-import json
 
 import requests
 
@@ -17,13 +16,17 @@ def send_transaction(address: str, tx: Transaction):
 
 def get_possible_ids(address: str) -> list[str]:
     resp = requests.get(
-        url=f"http://{address}/ids",
+        url=f"http://{address}/users",
     )
     return resp.json()
 
 
-def get_ledger(address: str) -> dict[str, float]:
+def get_ledger(address: str, id: str) -> dict[str, float]:
     resp = requests.get(
         url=f"http://{address}/ledger",
+        headers={"Content-Type": "application/json"},
+        json={"id": id},
     )
+    if resp.status_code != 200:
+        print(f"Err: {resp.status_code} {resp.text}")
     return resp.json()
