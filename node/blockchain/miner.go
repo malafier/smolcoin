@@ -50,6 +50,9 @@ func (m *Miner) ListenAndMine() {
 		case newTx := <-m.InTx:
 			log.Println("[Miner] New transaction recieved")
 			m.mempool = append(m.mempool, newTx)
+			if len(m.mempool) == 1 {
+				m.mempool = append(m.mempool, Coinbase(newTx.Sender))
+			}
 			m.isStopped = false
 
 			var err error

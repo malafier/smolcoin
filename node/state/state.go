@@ -45,6 +45,7 @@ func NewNodeState(host string, port int, miner *bc.Miner) *NodeState {
 		Port:       port,
 		Blockchain: []bc.Block{bc.Genesis},
 		Peers:      make(map[string]Peer),
+		Ledger:     make(map[string]float32),
 		miner:      miner,
 	}
 	node.PeerHeader = make(http.Header)
@@ -181,11 +182,11 @@ func (ns *NodeState) UpdateLedger() {
 	ns.Ledger = ledger
 }
 
-func (ns *NodeState) GetClients() []string {
+func (ns *NodeState) GetIds() []string {
 	ns.ChainLock.RLock()
 	defer ns.ChainLock.RUnlock()
 
-	keys := []string{}
+	keys := make([]string, 0, len(ns.Ledger))
 	for key := range ns.Ledger {
 		keys = append(keys, key)
 	}
@@ -196,4 +197,14 @@ func (ns *NodeState) GetLedger() map[string]float32 {
 	ns.ChainLock.RLock()
 	defer ns.ChainLock.RUnlock()
 	return ns.Ledger
+}
+
+func (ns *NodeState) AddId(id string) {
+	ns.ChainLock.Lock()
+	defer ns.ChainLock.Unlock()
+	_, ok := ns.Ledger[id]
+	if !ok {
+		ns.Ledger[id] = 0.0
+		log.Print("[Node] Id added to ledger")
+	}
 }

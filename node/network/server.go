@@ -47,12 +47,21 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Node running on %s", s.State.Addr())
 }
 
-func (s *Server) handleGetClients(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetIds(w http.ResponseWriter, r *http.Request) {
 	log.Println("[Node] Sent clients")
-	respondWithJSON(w, http.StatusOK, s.State.GetClients())
+	respondWithJSON(w, http.StatusOK, s.State.GetIds())
 }
 
 func (s *Server) handleGetLedger(w http.ResponseWriter, r *http.Request) {
+	req := struct {
+		Id string `json:"id"`
+	}{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer r.Body.Close()
+	s.State.AddId(req.Id)
 	log.Println("[Node] Sent ledger")
 	respondWithJSON(w, http.StatusOK, s.State.GetLedger())
 }
@@ -208,7 +217,7 @@ func (s *Server) Start() {
 	router := http.NewServeMux()
 
 	router.HandleFunc("GET /", s.handleIndex)
-	router.HandleFunc("GET /users", s.handleGetClients)
+	router.HandleFunc("GET /users", s.handleGetIds)
 	router.HandleFunc("GET /ledger", s.handleGetLedger)
 	router.HandleFunc("GET /peers", s.handleGetPeers)
 	router.HandleFunc("POST /peer", s.handleAddPeer)
