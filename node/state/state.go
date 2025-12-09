@@ -98,6 +98,9 @@ func (ns *NodeState) PeerCount() int {
 	return len(ns.Peers)
 }
 
+// TODO: dodać walidacje hashy transakcji w bloku -- czy się nie powtarzają
+// należy też dodać hashe których nie ma
+// dodać walidacje wszystkich transakcji
 func (ns *NodeState) AddBlock(block *bc.Block) error {
 	if !block.IsValid() {
 		return errors.New("Given block is not valid")
