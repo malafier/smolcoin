@@ -7,6 +7,7 @@ from src.transactions import Transaction
 
 def send_transaction(address: str, tx: Transaction):
     data = dataclasses.asdict(tx)
+    print(data)
     requests.post(
         url=f"http://{address}/transaction",
         headers={"Content-Type": "application/json"},

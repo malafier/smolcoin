@@ -1,4 +1,5 @@
 import json
+import time
 
 import requests
 from prompt_toolkit.shortcuts import (
@@ -136,6 +137,7 @@ Smolcoins: {'No info' if self.coins is None else self.coins}
                 break
             elif tx_choice == "cancel":
                 return
+        tx.timestamp = int(time.time())
         return tx
 
     def _save_keys(self):

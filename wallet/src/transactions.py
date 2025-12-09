@@ -30,4 +30,4 @@ class Transaction:
             "difficulty": self.difficulty,
         }
         tx_str = json.dumps(tx, sort_keys=True)
-        self.signature = base64.b64encode(sign(sk, tx_str)).decode("utf-8")
+        self.signature = sign(sk, tx_str).hex()
