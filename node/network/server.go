@@ -46,7 +46,7 @@ func (s *Server) checkHeaders(next http.Handler) http.Handler {
 			// TODO: handle client pub key
 
 		default:
-			http.Error(w, "Request must contain at least one valid header", http.StatusBadRequest)
+			// http.Error(w, "Request must contain at least one valid header", http.StatusBadRequest)
 			return
 		}
 
