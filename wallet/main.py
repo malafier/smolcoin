@@ -25,8 +25,7 @@ def main():
         print("Failed to decrypt file.")
         exit(1)
 
-    if login == "admin":
-        print(keys)
+    print(keys)
     app = App(password, keys, path, node_adr)
     app.run()
 
