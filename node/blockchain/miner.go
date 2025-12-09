@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const DEFAULT_DIFFICULTY int = 5
-
 type NetPayload struct {
 	Block  *Block
 	NewTsx []Transaction
