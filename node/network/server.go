@@ -26,29 +26,17 @@ func NewServer(state *state.NodeState, initialPeer string) *Server {
 func (s *Server) checkHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peerInfo := r.Header.Get("Peer")
-		clientInfo := r.Header.Get("Client")
-
-		switch {
-		case peerInfo != "":
-			if s.State.PeerCount() > 3 {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			host, port, err := parsePeer(peerInfo)
-			if err != nil {
-				http.Error(w, "Wrong peer address", http.StatusBadRequest)
-				return
-			}
-			s.State.AddPeer(host, port)
-
-		case clientInfo != "":
-			// TODO: handle client pub key
-
-		default:
-			// http.Error(w, "Request must contain at least one valid header", http.StatusBadRequest)
+		if peerInfo == "" || s.State.PeerCount() > 3 {
+			next.ServeHTTP(w, r)
 			return
 		}
+
+		host, port, err := parsePeer(peerInfo)
+		if err != nil {
+			http.Error(w, "Wrong peer address", http.StatusBadRequest)
+			return
+		}
+		s.State.AddPeer(host, port)
 
 		next.ServeHTTP(w, r)
 	})
@@ -60,7 +48,13 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetClients(w http.ResponseWriter, r *http.Request) {
-	respondWithJSON(w, http.StatusOK, map[string][]string{"clients": s.State.GetClients()})
+	log.Println("[Node] Sent clients")
+	respondWithJSON(w, http.StatusOK, s.State.GetClients())
+}
+
+func (s *Server) handleGetLedger(w http.ResponseWriter, r *http.Request) {
+	log.Println("[Node] Sent ledger")
+	respondWithJSON(w, http.StatusOK, s.State.GetLedger())
 }
 
 func (s *Server) handleAddPeer(w http.ResponseWriter, r *http.Request) {
@@ -204,7 +198,6 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	client := http.Client{Timeout: 5 * time.Second}
 	if _, err := client.Do(req); err == nil {
 		s.State.AddPeer(host, port)
-		log.Printf("[Node] Successfully connected to initial peer %s\n", initialPeer)
 	} else {
 		log.Printf("[E] Failed to connect to %s. Error: %v\n", initialPeer, err)
 	}
@@ -216,6 +209,7 @@ func (s *Server) Start() {
 
 	router.HandleFunc("GET /", s.handleIndex)
 	router.HandleFunc("GET /users", s.handleGetClients)
+	router.HandleFunc("GET /ledger", s.handleGetLedger)
 	router.HandleFunc("GET /peers", s.handleGetPeers)
 	router.HandleFunc("POST /peer", s.handleAddPeer)
 	router.HandleFunc("POST /block", s.handleNewBlock)

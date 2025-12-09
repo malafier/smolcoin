@@ -20,7 +20,6 @@ type Transaction struct {
 	Ammount    float32 `json:"ammount"`
 	Timestamp  int     `json:"timestamp"`
 	Difficulty int     `json:"difficulty"`
-	PublicKey  string  `json:"pub_key"`
 	Signature  string  `json:"signature"`
 }
 
@@ -65,7 +64,7 @@ func (t *Transaction) String() string {
 }
 
 func (t *Transaction) TransactionIsValid() bool {
-	publicKey, err := pemToPublicKey(t.PublicKey)
+	publicKey, err := pemToPublicKey(t.Sender)
 	if err != nil {
 		log.Printf("%s\n", err)
 		return false

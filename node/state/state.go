@@ -21,8 +21,6 @@ func (p *Peer) Addr() string {
 	return fmt.Sprintf("%s:%d", p.Host, p.Port)
 }
 
-// TODO: should be defided by smaller structs
-// also write interface for new block and mempool changes
 type NodeState struct {
 	Host       string
 	Port       int
@@ -70,7 +68,7 @@ func (ns *NodeState) AddPeer(host string, port int) error {
 	ns.Peers[addr] = newPeer
 	ns.PeersLock.Unlock()
 
-	log.Printf("[I] Added new peer: %s\n", addr)
+	log.Printf("[Node] Added new peer: %s\n", addr)
 	return nil
 }
 
@@ -137,6 +135,7 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 		}
 	}
 
+	ns.UpdateLedger()
 	return nil
 }
 
@@ -184,11 +183,17 @@ func (ns *NodeState) UpdateLedger() {
 
 func (ns *NodeState) GetClients() []string {
 	ns.ChainLock.RLock()
-	defer ns.ChainLock.Unlock()
+	defer ns.ChainLock.RUnlock()
 
 	keys := []string{}
 	for key := range ns.Ledger {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+func (ns *NodeState) GetLedger() map[string]float32 {
+	ns.ChainLock.RLock()
+	defer ns.ChainLock.RUnlock()
+	return ns.Ledger
 }
