@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -26,6 +28,7 @@ type Transaction struct {
 	Signature  string  `json:"signature"`
 }
 
+// TODO: dodać walidaje, tak aby nie można było dodawać coinbase w nieskończoność
 func Coinbase(reciever string) Transaction {
 	coinbase := Transaction{
 		Sender:     COINBASE_PK,
@@ -81,6 +84,10 @@ func (t *Transaction) String() string {
 	return out.String()
 }
 
+// TODO:
+// dodać walidację Ammount > 0
+// dodać sprawdzenie z ledgerem
+// dodać sprawdzenie z mempool-em minera
 func (t *Transaction) TransactionIsValid() bool {
 	publicKey, err := pemToPublicKey(t.Sender)
 	if err != nil {
@@ -93,10 +100,11 @@ func (t *Transaction) TransactionIsValid() bool {
 		log.Printf("[I] Serializarion not good")
 		return false
 	}
-	hashedData := hash(serializedData)
-	valid := ecdsa.VerifyASN1(publicKey, []byte(hashedData), []byte(t.Signature))
+	hashedData := sha256.Sum256(serializedData)
+	signByte, _ := hex.DecodeString(t.Signature)
+	valid := ecdsa.VerifyASN1(publicKey, hashedData[:], signByte)
 	if !valid {
-		log.Printf("[I] Validation not good\npk: %s\nh: %s\ns: %s\ntxt: %s", t.Sender, hashedData, t.Signature, string(serializedData))
+		log.Printf("[I] Validation not good\npk: %s\nh: %s\ns: %s\ntxt: %s", t.Sender, hex.EncodeToString(hashedData[:]), t.Signature, string(serializedData))
 	}
 	return valid
 }
