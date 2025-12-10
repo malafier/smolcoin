@@ -222,6 +222,7 @@ func (ns *NodeState) Mine() {
 		}
 	}
 
+	log.Printf("[Node] Waiting for miner...")
 	for block := range ns.miner.OutBlock {
 		log.Printf("Mined new block: %s\n", block.Hash[:16])
 		ns.AddBlock(block)
