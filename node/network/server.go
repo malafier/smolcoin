@@ -212,7 +212,6 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	}
 }
 
-// TODO: make this non blocking
 func (s *Server) Start() {
 	router := http.NewServeMux()
 

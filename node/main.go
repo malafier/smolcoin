@@ -27,5 +27,7 @@ func main() {
 	state := NewNodeState(*host, *port, miner)
 
 	server := NewServer(state, *peer)
-	server.Start()
+	go server.Start()
+
+	state.Mine()
 }

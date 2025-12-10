@@ -215,3 +215,15 @@ func (ns *NodeState) AddId(id string) {
 		log.Print("[Node] Id added to ledger")
 	}
 }
+
+func (ns *NodeState) Mine() {
+	if ns.miner == nil {
+		for {
+		}
+	}
+
+	for block := range ns.miner.OutBlock {
+		log.Printf("Mined new block: %s\n", block.Hash[:16])
+		ns.AddBlock(block)
+	}
+}
