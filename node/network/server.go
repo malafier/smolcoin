@@ -21,7 +21,7 @@ func NewServer(state *state.NodeState, initialPeer string) *Server {
 	return server
 }
 
-func (s *Server) checkHeaders(next http.Handler) http.Handler {
+func (s *Server) checkPeerHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peerInfo := r.Header.Get("Peer")
 		if peerInfo == "" || s.State.PeerCount() > 3 {
@@ -158,7 +158,7 @@ func (s *Server) Start() {
 	router.HandleFunc("POST /block", s.handleNewBlock)
 	router.HandleFunc("POST /transaction", s.handleNewTransaction)
 
-	handlerWithMiddleware := s.checkHeaders(router)
+	handlerWithMiddleware := s.checkPeerHeader(router)
 
 	serverAddr := s.State.Addr()
 	log.Printf("[Node] Starting node on http://%s\n", serverAddr)
