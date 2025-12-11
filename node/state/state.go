@@ -29,11 +29,11 @@ type NodeState struct {
 	PeerHeader http.Header
 	Difficulty int
 
-	// Blockchain
-	Blockchain []bc.Block
-	Ledger     map[string]float32
-	ChainLock  sync.RWMutex
-	txHistory  []string
+	// blockchain
+	blockchain []bc.Block
+	ledger     map[string]float32
+	chainLock  sync.RWMutex
+	txHistory  map[string]bool
 
 	// Peers
 	Peers     map[string]Peer
@@ -46,9 +46,10 @@ func NewNodeState(host string, port int, miner *bc.Miner) *NodeState {
 	node := &NodeState{
 		Host:       host,
 		Port:       port,
-		Blockchain: []bc.Block{bc.Genesis},
+		blockchain: []bc.Block{bc.Genesis},
+		txHistory:  make(map[string]bool),
 		Peers:      make(map[string]Peer),
-		Ledger:     make(map[string]float32),
+		ledger:     make(map[string]float32),
 		miner:      miner,
 	}
 	node.PeerHeader = make(http.Header)
@@ -108,10 +109,11 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 		return errors.New("Given block is not valid")
 	}
 
-	ns.ChainLock.Lock()
-	defer ns.ChainLock.Unlock()
+	ns.chainLock.Lock()
+	defer ns.chainLock.Unlock()
 
-	lastBlock := ns.Blockchain[len(ns.Blockchain)-1]
+	// Validation
+	lastBlock := ns.blockchain[len(ns.blockchain)-1]
 	if lastBlock.Index+1 != block.Index {
 		return errors.New("Indexes mismatch")
 	}
@@ -123,7 +125,25 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 		return errors.New("Prefix not long enough")
 	}
 
-	ns.Blockchain = append(ns.Blockchain, *block)
+	txs, _ := bc.StrToTrans(block.Transactions)
+	for _, tx := range txs {
+		txHash, err := tx.Hash()
+		if err != nil {
+			return errors.New("Transaction invalid")
+		}
+		inBlock, ok := ns.txHistory[txHash]
+		if inBlock && ok {
+			return errors.New("Transaction already in block")
+		}
+		if ok && !tx.TransactionIsValid() {
+			return errors.New("Transaction is invalid")
+		}
+
+		ns.txHistory[txHash] = true
+	}
+
+	// Appeding
+	ns.blockchain = append(ns.blockchain, *block)
 
 	// Reseting miner
 	if ns.miner != nil {
@@ -157,7 +177,8 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 	if err != nil {
 		return errors.New("Something went wrong with transaction. Sorry")
 	}
-	if slices.Contains(ns.txHistory, hash) {
+	_, ok := ns.txHistory[hash]
+	if ok {
 		return errors.New("Transaction already registered")
 	}
 
@@ -170,17 +191,18 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 		ns.miner.InTx <- tx
 	}
 
+	ns.txHistory[hash] = false
 	payload, _ := tx.Serialize()
 	go ns.broadcast("transaction", payload)
 	return nil
 }
 
 func (ns *NodeState) UpdateLedger() {
-	ns.ChainLock.Lock()
-	defer ns.ChainLock.Unlock()
+	ns.chainLock.Lock()
+	defer ns.chainLock.Unlock()
 
 	ledger := make(map[string]float32)
-	for _, block := range ns.Blockchain {
+	for _, block := range ns.blockchain {
 		transactions, err := block.ParseTransactions()
 		if err != nil {
 			log.Print("Failed to paarse transactions for some reason")
@@ -192,32 +214,32 @@ func (ns *NodeState) UpdateLedger() {
 			ledger[trans.Reciever] += trans.Ammount
 		}
 	}
-	ns.Ledger = ledger
+	ns.ledger = ledger
 }
 
 func (ns *NodeState) GetIds() []string {
-	ns.ChainLock.RLock()
-	defer ns.ChainLock.RUnlock()
+	ns.chainLock.RLock()
+	defer ns.chainLock.RUnlock()
 
-	keys := make([]string, 0, len(ns.Ledger))
-	for key := range ns.Ledger {
+	keys := make([]string, 0, len(ns.ledger))
+	for key := range ns.ledger {
 		keys = append(keys, key)
 	}
 	return keys
 }
 
 func (ns *NodeState) GetLedger() map[string]float32 {
-	ns.ChainLock.RLock()
-	defer ns.ChainLock.RUnlock()
-	return ns.Ledger
+	ns.chainLock.RLock()
+	defer ns.chainLock.RUnlock()
+	return ns.ledger
 }
 
 func (ns *NodeState) AddId(id string) {
-	ns.ChainLock.Lock()
-	defer ns.ChainLock.Unlock()
-	_, ok := ns.Ledger[id]
+	ns.chainLock.Lock()
+	defer ns.chainLock.Unlock()
+	_, ok := ns.ledger[id]
 	if !ok {
-		ns.Ledger[id] = 0.0
+		ns.ledger[id] = 0.0
 		log.Print("[Node] Id added to ledger")
 	}
 }

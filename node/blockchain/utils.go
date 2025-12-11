@@ -19,7 +19,7 @@ func transToStr(transactions []Transaction) (string, error) {
 	return string(byteTrans), nil
 }
 
-func strToTrans(str string) ([]Transaction, error) {
+func StrToTrans(str string) ([]Transaction, error) {
 	var parsed []Transaction
 	err := json.Unmarshal([]byte(str), &parsed)
 	if err != nil {
