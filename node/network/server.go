@@ -1,12 +1,10 @@
 package network
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	bc "node/blockchain"
@@ -107,16 +105,6 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 		respondWithMessage(w, http.StatusAccepted, err.Error())
 		return
 	}
-
-	// message, err := json.Marshal(req)
-	// if err != nil {
-	// 	log.Print("[E] Failed to marshal reqest for broadcast for some reason")
-	// 	respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
-	// 	return
-	// }
-
-	go s.broadcast("transaction", []byte(r.Body.Close().Error()))
-
 	respondWithMessage(w, http.StatusAccepted, "Transaction accepted and broadcasted")
 }
 
@@ -135,60 +123,7 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[Node] Recieved new block %s\n", req.Hash[:10])
-
-	// message, err := req.SerializeWithoutHash()
-	// if err != nil {
-	// 	log.Print("[E] Failed to marshal reqest for broadcast for some reason")
-	// 	respondWithError(w, http.StatusBadRequest, "Failed to marshal reqest for broadcast for some reason")
-	// 	return
-	// }
-
-	go s.broadcast("block", []byte(r.Body.Close().Error()))
-
 	respondWithMessage(w, http.StatusAccepted, "Block added to chain")
-}
-
-func (s *Server) broadcast(uri string, payload []byte) {
-	peerList := s.State.PeersList()
-	log.Printf("[Node] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload))
-
-	var wg sync.WaitGroup
-	for _, peer := range peerList {
-		wg.Add(1)
-		go func(p state.Peer) {
-			defer wg.Done()
-			s.sendReqToPeer(p, uri, payload)
-		}(peer)
-	}
-	wg.Wait()
-	log.Println("[Node] Broadcast finished.")
-}
-
-func (s *Server) sendReqToPeer(peer state.Peer, uri string, payload []byte) {
-	url := fmt.Sprintf("http://%s/%s", peer.Addr(), uri)
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
-	if err != nil {
-		log.Printf("  - [W] Failed to create request for %s. Error: %v\n", peer.Addr(), err)
-		return
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Peer", s.State.Addr())
-
-	client := http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("  - [W] Failed to send message to %s. Error: %v\n", peer.Addr(), err)
-		if checkPeerDead(peer) {
-			log.Printf("  - [E] Failed to connect to %s. Peer removed.\n", peer.Addr())
-			s.State.RemovePeer(peer)
-		}
-		return
-	}
-	defer resp.Body.Close()
-
-	log.Printf("  - [I] Sent to %s (Status: %s)\n", peer.Addr(), resp.Status)
 }
 
 func (s *Server) connectToInitialPeer(initialPeer string) {

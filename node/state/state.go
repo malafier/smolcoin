@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	bc "node/blockchain"
 )
@@ -141,6 +143,8 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	}
 
 	ns.UpdateLedger()
+	payload, _ := block.Serialize()
+	go ns.broadcast("block", payload)
 	return nil
 }
 
@@ -166,6 +170,8 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 		ns.miner.InTx <- tx
 	}
 
+	payload, _ := tx.Serialize()
+	go ns.broadcast("transaction", payload)
 	return nil
 }
 
@@ -227,4 +233,53 @@ func (ns *NodeState) Mine() {
 		log.Printf("Mined new block: %s\n", block.Hash[:16])
 		ns.AddBlock(block)
 	}
+}
+
+func (ns *NodeState) broadcast(uri string, payload []byte) {
+	peerList := ns.PeersList()
+	log.Printf("[Node] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload))
+
+	var wg sync.WaitGroup
+	for _, peer := range peerList {
+		wg.Add(1)
+		go func(p Peer) {
+			defer wg.Done()
+			ns.sendReqToPeer(p, uri, payload)
+		}(peer)
+	}
+	wg.Wait()
+	log.Println("[Node] Broadcast finished.")
+}
+
+func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
+	url := fmt.Sprintf("http://%s/%s", peer.Addr(), uri)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	if err != nil {
+		log.Printf("  - [W] Failed to create request for %s. Error: %v\n", peer.Addr(), err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Peer", ns.Addr())
+
+	client := http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("  - [W] Failed to send message to %s. Error: %v\n", peer.Addr(), err)
+		if checkPeerDead(peer) {
+			log.Printf("  - [E] Failed to connect to %s. Peer removed.\n", peer.Addr())
+			ns.RemovePeer(peer)
+		}
+		return
+	}
+	defer resp.Body.Close()
+
+	log.Printf("  - [I] Sent to %s (Status: %s)\n", peer.Addr(), resp.Status)
+}
+
+func checkPeerDead(peer Peer) bool {
+	checkClient := http.Client{Timeout: 1 * time.Second}
+	_, err := checkClient.Get(fmt.Sprintf("http://%s/", peer.Addr()))
+	return err != nil
 }

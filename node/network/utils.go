@@ -2,16 +2,13 @@ package network
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"slices"
 	"strconv"
-	"time"
 
 	bc "node/blockchain"
-	state "node/state"
 )
 
 func respondWithJSON(w http.ResponseWriter, code int, payload any) {
@@ -33,12 +30,6 @@ func respondWithMessage(w http.ResponseWriter, code int, message string) {
 
 func respondWithError(w http.ResponseWriter, code int, message string) {
 	respondWithJSON(w, code, map[string]string{"error": message})
-}
-
-func checkPeerDead(peer state.Peer) bool {
-	checkClient := http.Client{Timeout: 1 * time.Second}
-	_, err := checkClient.Get(fmt.Sprintf("http://%s/", peer.Addr()))
-	return err != nil
 }
 
 func sliceIntersection(t1, t2 []bc.Transaction) []bc.Transaction {
