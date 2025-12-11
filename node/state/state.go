@@ -125,7 +125,7 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 		return errors.New("Prefix not long enough")
 	}
 
-	txs, _ := bc.StrToTrans(block.Transactions)
+	txs, _ := block.GetTransactions()
 	for _, tx := range txs {
 		txHash, err := tx.Hash()
 		if err != nil {
