@@ -288,20 +288,11 @@ func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
 	client := http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		ns.RemovePeer(peer)
 		log.Printf("  - [W] Failed to send message to %s. Error: %v\n", peer.Addr(), err)
-		if checkPeerDead(peer) {
-			log.Printf("  - [E] Failed to connect to %s. Peer removed.\n", peer.Addr())
-			ns.RemovePeer(peer)
-		}
 		return
 	}
 	defer resp.Body.Close()
 
 	log.Printf("  - [I] Sent to %s (Status: %s)\n", peer.Addr(), resp.Status)
-}
-
-func checkPeerDead(peer Peer) bool {
-	checkClient := http.Client{Timeout: 1 * time.Second}
-	_, err := checkClient.Get(fmt.Sprintf("http://%s/", peer.Addr()))
-	return err != nil
 }
