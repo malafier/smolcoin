@@ -115,9 +115,12 @@ func (m *Miner) MempoolContains(txHash string) bool {
 	return slices.Contains(hashes, txHash)
 }
 
-func (m *Miner) GetMempoolAndStop() []Transaction {
+func (m *Miner) GetMempool() []Transaction {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.isStopped = true
 	return m.mempool
+}
+
+func (m *Miner) Stop() {
+	m.isStopped = true
 }

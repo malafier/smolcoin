@@ -102,7 +102,6 @@ func (ns *NodeState) PeerCount() int {
 }
 
 // TODO: dodać walidacje hashy transakcji w bloku -- czy się nie powtarzają
-// należy też dodać hashe których nie ma
 // dodać walidacje wszystkich transakcji
 func (ns *NodeState) AddBlock(block *bc.Block) error {
 	if !block.IsValid() {
@@ -148,7 +147,8 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 
 	// Reseting miner
 	if ns.miner != nil {
-		mempool := ns.miner.GetMempoolAndStop()
+		mempool := ns.miner.GetMempool()
+		ns.miner.Stop()
 		txs, _ := block.GetTransactions()
 		var newMempool []bc.Transaction
 		for _, tx := range mempool {
@@ -182,6 +182,11 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 	_, ok := ns.txHistory[hash]
 	if ok {
 		return errors.New("Transaction already registered")
+	}
+	ledger := ns.ledgerWithMempool()
+	record := ledger[tx.Sender]
+	if record-tx.Ammount < 0.0 {
+		return errors.New("Cannot send more coins than what you have")
 	}
 
 	if ns.miner != nil {
@@ -297,4 +302,17 @@ func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
 	defer resp.Body.Close()
 
 	log.Printf("  - [I] Sent to %s (Status: %s)\n", peer.Addr(), resp.Status)
+}
+
+func (ns *NodeState) ledgerWithMempool() map[string]float32 {
+	ns.chainLock.RLock()
+	defer ns.chainLock.RUnlock()
+
+	ledger := ns.ledger
+	mempool := ns.miner.GetMempool()
+	for _, tx := range mempool {
+		ledger[tx.Sender] -= tx.Ammount
+		ledger[tx.Reciever] += tx.Ammount
+	}
+	return ledger
 }
