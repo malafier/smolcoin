@@ -31,3 +31,8 @@ func main() {
 
 	state.Mine()
 }
+
+// TODO:
+// Wielu górników
+// Obsługa forków oraz orphan block
+// Eksperyment: jak sieć zachowa się, gdy złośliwy węzeł będzie wymuszać tworzenie forków?
