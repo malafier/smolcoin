@@ -135,8 +135,9 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 		if inBlock && ok {
 			return errors.New("Transaction already in block")
 		}
-		if ok && !tx.TransactionIsValid() {
-			return errors.New("Transaction is invalid")
+		err = tx.Validate()
+		if ok && err != nil {
+			return fmt.Errorf("Transaction is invalid: %s", err)
 		}
 
 		ns.txHistory[txHash] = true
@@ -169,8 +170,9 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 }
 
 func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
-	if !tx.TransactionIsValid() {
-		return errors.New("Transaction failed verification.")
+	err := tx.Validate()
+	if err != nil {
+		return fmt.Errorf("Transaction invalid: %s", err)
 	}
 
 	hash, err := tx.Hash()

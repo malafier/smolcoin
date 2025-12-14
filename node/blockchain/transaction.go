@@ -81,29 +81,32 @@ func (t *Transaction) String() string {
 	return out.String()
 }
 
-// TODO:
-// dodać walidację Ammount > 0
-// dodać sprawdzenie z ledgerem
-// dodać sprawdzenie z mempool-em minera
-func (t *Transaction) TransactionIsValid() bool {
+func (t *Transaction) Validate() error {
+	if t.Ammount < 0.0 {
+		return errors.New("Cannot send minus coins")
+	}
+
+	// Signature verification
 	publicKey, err := pemToPublicKey(t.Sender)
 	if err != nil {
-		log.Printf("[E] %s\n", err)
-		return false
+		return errors.New("Failed to recieve public key from login")
 	}
 
 	serializedData, err := t.SerializeWithoutSign()
 	if err != nil {
-		log.Printf("[I] Serializarion not good")
-		return false
+		return errors.New("Serialization failed")
 	}
 	hashedData := sha256.Sum256(serializedData)
-	signByte, _ := hex.DecodeString(t.Signature)
-	valid := ecdsa.VerifyASN1(publicKey, hashedData[:], signByte)
-	if !valid {
-		log.Printf("[I] Validation not good\npk: %s\nh: %s\ns: %s\ntxt: %s", t.Sender, hex.EncodeToString(hashedData[:]), t.Signature, string(serializedData))
+	signByte, err := hex.DecodeString(t.Signature)
+	if err != nil {
+		return errors.New("Wrong signature")
 	}
-	return valid
+
+	if !ecdsa.VerifyASN1(publicKey, hashedData[:], signByte) {
+		log.Printf("[I] Validation not good\npk: %s\nh: %s\ns: %s\ntxt: %s", t.Sender, hex.EncodeToString(hashedData[:]), t.Signature, string(serializedData))
+		return errors.New("Signature invalid")
+	}
+	return nil
 }
 
 func pemToPublicKey(pemKey string) (*ecdsa.PublicKey, error) {
