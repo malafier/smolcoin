@@ -48,11 +48,10 @@ func (t *Transaction) Serialize() ([]byte, error) {
 
 func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 	data := struct {
-		Sender     string  `json:"sender"`
-		Reciever   string  `json:"reciever"`
-		Ammount    float32 `json:"ammount"`
-		Timestamp  int     `json:"timestamp"`
-		Difficulty int     `json:"difficulty"`
+		Sender    string  `json:"sender"`
+		Reciever  string  `json:"reciever"`
+		Ammount   float32 `json:"ammount"`
+		Timestamp int     `json:"timestamp"`
 	}{
 		Sender:    t.Sender,
 		Reciever:  t.Reciever,
@@ -73,9 +72,9 @@ func (t *Transaction) Hash() (string, error) {
 func (t *Transaction) String() string {
 	var out bytes.Buffer
 	out.WriteString("From: ")
-	out.WriteString(t.Sender[:10])
+	out.WriteString(t.SenderId()[:10])
 	out.WriteString("  To: ")
-	out.WriteString(t.Reciever[:10])
+	out.WriteString(t.RecieverId()[:10])
 	out.WriteString("  Ammount: ")
 	out.WriteString(fmt.Sprintf("%f\n", t.Ammount))
 	return out.String()
@@ -107,6 +106,14 @@ func (t *Transaction) Validate() error {
 		return errors.New("Signature invalid")
 	}
 	return nil
+}
+
+func (t *Transaction) SenderId() string {
+	return keyAsId(t.Sender)
+}
+
+func (t *Transaction) RecieverId() string {
+	return keyAsId(t.Reciever)
 }
 
 func pemToPublicKey(pemKey string) (*ecdsa.PublicKey, error) {

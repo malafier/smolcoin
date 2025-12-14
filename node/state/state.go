@@ -184,7 +184,7 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 		return errors.New("Transaction already registered")
 	}
 	ledger := ns.ledgerWithMempool()
-	record := ledger[tx.Sender]
+	record := ledger[tx.SenderId()]
 	if record-tx.Ammount < 0.0 {
 		return errors.New("Cannot send more coins than what you have")
 	}
@@ -210,15 +210,15 @@ func (ns *NodeState) UpdateLedger() {
 
 	ledger := make(map[string]float32)
 	for _, block := range ns.blockchain {
-		transactions, err := block.ParseTransactions()
+		tsx, err := block.ParseTransactions()
 		if err != nil {
-			log.Print("Failed to paarse transactions for some reason")
+			log.Print("Failed to parse transactions for some reason")
 			continue
 		}
 
-		for _, trans := range transactions {
-			ledger[trans.Sender] -= trans.Ammount
-			ledger[trans.Reciever] += trans.Ammount
+		for _, tx := range tsx {
+			ledger[tx.SenderId()] -= tx.Ammount
+			ledger[tx.RecieverId()] += tx.Ammount
 		}
 	}
 	ns.ledger = ledger
@@ -311,8 +311,8 @@ func (ns *NodeState) ledgerWithMempool() map[string]float32 {
 	ledger := ns.ledger
 	mempool := ns.miner.GetMempool()
 	for _, tx := range mempool {
-		ledger[tx.Sender] -= tx.Ammount
-		ledger[tx.Reciever] += tx.Ammount
+		ledger[tx.SenderId()] -= tx.Ammount
+		ledger[tx.RecieverId()] += tx.Ammount
 	}
 	return ledger
 }
