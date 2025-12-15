@@ -2,15 +2,30 @@ package main
 
 import (
 	"flag"
+	"log/slog"
+	"os"
+	"time"
 
 	bc "node/blockchain"
 	. "node/network"
 	. "node/state"
+
+	tint "github.com/lmittmann/tint"
 )
 
 const DEFAULT_DIFFICULTY int = 5
 
 func main() {
+	// Logging
+	handler := tint.NewHandler(os.Stderr, &tint.Options{
+		Level:      slog.LevelDebug,
+		TimeFormat: time.Kitchen,
+	})
+
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+
+	// Args
 	port := flag.Int("p", 3000, "The port number for the node to listen on.")
 	host := flag.String("H", "127.0.0.1", "The host address for the node to bind to.")
 	diff := flag.Int("d", DEFAULT_DIFFICULTY, "Block mining difficulty")

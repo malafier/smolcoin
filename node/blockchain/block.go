@@ -3,7 +3,7 @@ package blockchain
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 )
 
 type Block struct {
@@ -22,13 +22,13 @@ func (b *Block) IsValid() bool {
 
 	blockJson, err := b.SerializeWithoutHash()
 	if err != nil {
-		log.Printf("Failed to mashal a block.")
+		slog.Error("Failed to mashal a block.")
 		return false
 	}
 
 	_, err = strToTrans(b.Transactions)
 	if err != nil {
-		log.Printf("Failed to parse transactions")
+		slog.Error("Failed to parse transactions")
 		return false
 	}
 

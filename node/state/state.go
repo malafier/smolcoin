@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -73,7 +73,7 @@ func (ns *NodeState) AddPeer(host string, port int) error {
 	ns.Peers[addr] = newPeer
 	ns.PeersLock.Unlock()
 
-	log.Printf("[Node] Added new peer: %s\n", addr)
+	slog.Info("[Node] Added new peer", "peer", addr)
 	return nil
 }
 
@@ -212,7 +212,7 @@ func (ns *NodeState) UpdateLedger() {
 	for _, block := range ns.blockchain {
 		tsx, err := block.ParseTransactions()
 		if err != nil {
-			log.Print("Failed to parse transactions for some reason")
+			slog.Info("Failed to parse transactions for some reason")
 			continue
 		}
 
@@ -247,7 +247,7 @@ func (ns *NodeState) AddId(id string) {
 	_, ok := ns.ledger[id]
 	if !ok {
 		ns.ledger[id] = 0.0
-		log.Print("[Node] Id added to ledger")
+		slog.Info("[Node] Id added to ledger")
 	}
 }
 
@@ -257,16 +257,16 @@ func (ns *NodeState) Mine() {
 		}
 	}
 
-	log.Printf("[Node] Waiting for miner...")
+	slog.Info("[Node] Waiting for miner...")
 	for block := range ns.miner.OutBlock {
-		log.Printf("Mined new block: %s\n", block.Hash[:16])
+		slog.Info("Mined new block", "hash", block.Hash[:16])
 		ns.AddBlock(block)
 	}
 }
 
 func (ns *NodeState) broadcast(uri string, payload []byte) {
 	peerList := ns.PeersList()
-	log.Printf("[Node] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload))
+	slog.Info(fmt.Sprintf("[Node] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload)))
 
 	var wg sync.WaitGroup
 	for _, peer := range peerList {
@@ -277,7 +277,7 @@ func (ns *NodeState) broadcast(uri string, payload []byte) {
 		}(peer)
 	}
 	wg.Wait()
-	log.Println("[Node] Broadcast finished.")
+	slog.Info("[Node] Broadcast finished.")
 }
 
 func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
@@ -285,7 +285,7 @@ func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
-		log.Printf("  - [W] Failed to create request for %s. Error: %v\n", peer.Addr(), err)
+		slog.Warn("  - Failed to create request for peer", "peer", peer.Addr(), "err", err)
 		return
 	}
 
@@ -296,12 +296,12 @@ func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
 	resp, err := client.Do(req)
 	if err != nil {
 		ns.RemovePeer(peer)
-		log.Printf("  - [W] Failed to send message to %s. Error: %v\n", peer.Addr(), err)
+		slog.Warn("  - Failed to send message for peer", "peer", peer.Addr(), "err", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	log.Printf("  - [I] Sent to %s (Status: %s)\n", peer.Addr(), resp.Status)
+	slog.Info(fmt.Sprintf("  - Sent to %s (Status: %s)\n", peer.Addr(), resp.Status))
 }
 
 func (ns *NodeState) ledgerWithMempool() map[string]float32 {

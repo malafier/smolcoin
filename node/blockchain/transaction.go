@@ -11,7 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -102,7 +102,12 @@ func (t *Transaction) Validate() error {
 	}
 
 	if !ecdsa.VerifyASN1(publicKey, hashedData[:], signByte) {
-		log.Printf("[I] Validation not good\npk: %s\nh: %s\ns: %s\ntxt: %s", t.Sender, hex.EncodeToString(hashedData[:]), t.Signature, string(serializedData))
+		slog.Error("Validation not good",
+			"pk", t.Sender,
+			"hash", hex.EncodeToString(hashedData[:]),
+			"sing", t.Signature,
+			"msg", string(serializedData),
+		)
 		return errors.New("Signature invalid")
 	}
 	return nil

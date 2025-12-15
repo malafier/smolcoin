@@ -3,7 +3,7 @@ package network
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -46,7 +46,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetIds(w http.ResponseWriter, r *http.Request) {
-	log.Println("[Node] Sent clients")
+	slog.Info("[Node] Sent clients")
 	respondWithJSON(w, http.StatusOK, s.State.GetIds())
 }
 
@@ -60,7 +60,7 @@ func (s *Server) handleGetLedger(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 	s.State.AddId(req.Id)
-	log.Println("[Node] Sent ledger")
+	slog.Info("[Node] Sent ledger")
 	respondWithJSON(w, http.StatusOK, s.State.GetLedger())
 }
 
@@ -91,17 +91,17 @@ func (s *Server) handleGetPeers(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 	var req bc.Transaction
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("[E] Failed to decode request: %s\n-- Err: %s", r.Body, err)
+		slog.Error("Failed to decode request", "err", err)
 		respondWithError(w, http.StatusBadRequest, "Invalid data.")
 		return
 	}
 	defer r.Body.Close()
 
-	log.Printf("[I] Recieved new transaction: %s\n", req.String())
+	slog.Info("Recieved new transactionn", "tx", req.String())
 
 	err := s.State.AddTransaction(req)
 	if err != nil {
-		log.Printf("[Node] Transaction declined: %s", err.Error())
+		slog.Info("[Node] Transaction declined", "err", err.Error())
 		respondWithMessage(w, http.StatusAccepted, err.Error())
 		return
 	}
@@ -117,12 +117,12 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if err := s.State.AddBlock(req); err != nil {
-		log.Printf("[Node] Block declined: %s", err.Error())
+		slog.Info("[Node] Block declined", "err", err.Error())
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Block declined: %s.", err.Error()))
 		return
 	}
 
-	log.Printf("[Node] Recieved new block %s\n", req.Hash[:10])
+	slog.Info("[Node] Recieved new block", "hash", req.Hash[:10])
 	respondWithMessage(w, http.StatusAccepted, "Block added to chain")
 }
 
@@ -132,7 +132,7 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	}
 	host, port, err := parsePeer(initialPeer)
 	if err != nil {
-		log.Printf("[E] Invalid initial peer address: %v\n", err)
+		slog.Error("Invalid initial peer address", "err", err.Error())
 		return
 	}
 
@@ -143,7 +143,7 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	if _, err := client.Do(req); err == nil {
 		s.State.AddPeer(host, port)
 	} else {
-		log.Printf("[E] Failed to connect to %s. Error: %v\n", initialPeer, err)
+		slog.Error("Failed to connect to peer", "peer", initialPeer, "err", err)
 	}
 }
 
@@ -161,8 +161,8 @@ func (s *Server) Start() {
 	handlerWithMiddleware := s.checkPeerHeader(router)
 
 	serverAddr := s.State.Addr()
-	log.Printf("[Node] Starting node on http://%s\n", serverAddr)
+	slog.Debug(fmt.Sprintf("[Node] Starting node on http://%s\n", serverAddr))
 	if err := http.ListenAndServe(serverAddr, handlerWithMiddleware); err != nil {
-		log.Fatalf("[F] Failed to start server: %v\n", err)
+		slog.Error("Failed to start server", "err", err)
 	}
 }
