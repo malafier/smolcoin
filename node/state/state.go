@@ -31,7 +31,7 @@ type NodeState struct {
 
 	// blockchain
 	blockchain []bc.Block
-	ledger     map[string]float32
+	ledger     map[string]float64
 	chainLock  sync.RWMutex
 	txHistory  map[string]bool
 
@@ -49,7 +49,7 @@ func NewNodeState(host string, port int, miner *bc.Miner) *NodeState {
 		blockchain: []bc.Block{bc.Genesis},
 		txHistory:  make(map[string]bool),
 		Peers:      make(map[string]Peer),
-		ledger:     make(map[string]float32),
+		ledger:     make(map[string]float64),
 		miner:      miner,
 	}
 	node.PeerHeader = make(http.Header)
@@ -208,7 +208,7 @@ func (ns *NodeState) UpdateLedger() {
 	ns.chainLock.Lock()
 	defer ns.chainLock.Unlock()
 
-	ledger := make(map[string]float32)
+	ledger := make(map[string]float64)
 	for _, block := range ns.blockchain {
 		tsx, err := block.ParseTransactions()
 		if err != nil {
@@ -235,7 +235,7 @@ func (ns *NodeState) GetIds() []string {
 	return keys
 }
 
-func (ns *NodeState) GetLedger() map[string]float32 {
+func (ns *NodeState) GetLedger() map[string]float64 {
 	ns.chainLock.RLock()
 	defer ns.chainLock.RUnlock()
 	return ns.ledger
@@ -304,7 +304,7 @@ func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
 	slog.Info(fmt.Sprintf("  - Sent to %s (Status: %s)\n", peer.Addr(), resp.Status))
 }
 
-func (ns *NodeState) ledgerWithMempool() map[string]float32 {
+func (ns *NodeState) ledgerWithMempool() map[string]float64 {
 	ns.chainLock.RLock()
 	defer ns.chainLock.RUnlock()
 

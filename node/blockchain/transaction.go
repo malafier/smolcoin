@@ -22,7 +22,7 @@ const COINBASE_PK string = "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZI
 type Transaction struct {
 	Sender    string  `json:"sender"`
 	Reciever  string  `json:"reciever"`
-	Ammount   float32 `json:"ammount"`
+	Ammount   float64 `json:"ammount"`
 	Timestamp int     `json:"timestamp"`
 	Signature string  `json:"signature"`
 }
@@ -50,7 +50,7 @@ func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 	data := struct {
 		Sender    string  `json:"sender"`
 		Reciever  string  `json:"reciever"`
-		Ammount   float32 `json:"ammount"`
+		Ammount   float64 `json:"ammount"`
 		Timestamp int     `json:"timestamp"`
 	}{
 		Sender:    t.Sender,
