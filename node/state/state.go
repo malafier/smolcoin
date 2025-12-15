@@ -266,7 +266,7 @@ func (ns *NodeState) Mine() {
 
 func (ns *NodeState) broadcast(uri string, payload []byte) {
 	peerList := ns.PeersList()
-	slog.Info(fmt.Sprintf("[Node] Broadcasting message to %d peer(s)...\nmessage: %s\n", len(peerList), string(payload)))
+	slog.Info(fmt.Sprintf("[Node] Broadcasting message to %d peer(s)...", len(peerList)))
 
 	var wg sync.WaitGroup
 	for _, peer := range peerList {
