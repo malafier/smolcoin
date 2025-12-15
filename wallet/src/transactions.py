@@ -1,4 +1,3 @@
-import base64
 import json
 from dataclasses import dataclass
 
@@ -23,8 +22,10 @@ class Transaction:
         tx = {
             "sender": self.sender,
             "reciever": self.reciever,
-            "ammount": self.ammount,
+            "ammount": int(self.ammount) if self.ammount.is_integer() else self.ammount,
             "timestamp": self.timestamp,
         }
-        tx_str = json.dumps(tx, sort_keys=True)
+        tx_str = json.dumps(tx, separators=(",", ":"))
+        print("msg:\n", tx_str)
         self.signature = sign(sk, tx_str).hex()
+        print("sig:\n", self.signature)
