@@ -309,10 +309,12 @@ func (ns *NodeState) ledgerWithMempool() map[string]float32 {
 	defer ns.chainLock.RUnlock()
 
 	ledger := ns.ledger
-	mempool := ns.miner.GetMempool()
-	for _, tx := range mempool {
-		ledger[tx.SenderId()] -= tx.Ammount
-		ledger[tx.RecieverId()] += tx.Ammount
+	if ns.miner != nil {
+		mempool := ns.miner.GetMempool()
+		for _, tx := range mempool {
+			ledger[tx.SenderId()] -= tx.Ammount
+			ledger[tx.RecieverId()] += tx.Ammount
+		}
 	}
 	return ledger
 }
