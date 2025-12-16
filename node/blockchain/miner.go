@@ -1,7 +1,7 @@
 package blockchain
 
 import (
-	"log"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -37,7 +37,7 @@ func NewMiner(difficlty int) *Miner {
 
 func (m *Miner) ListenAndMine() {
 	prefix := strings.Repeat("0", m.difficulty)
-	log.Println("[Miner] Started mining...")
+	slog.Debug("[Miner] Started mining...")
 
 	block := &Block{}
 
@@ -46,24 +46,25 @@ func (m *Miner) ListenAndMine() {
 		select {
 		// New transaction
 		case newTx := <-m.InTx:
-			log.Println("[Miner] New transaction recieved")
+			slog.Info("[Miner] New transaction recieved")
 			m.mempool = append(m.mempool, newTx)
-			if len(m.mempool) == 1 {
-				m.mempool = append(m.mempool, Coinbase(newTx.Sender))
-			}
+			// if len(m.mempool) == 1 {
+			// 	m.mempool = append(m.mempool, Coinbase(newTx.Sender))
+			// }
 			m.isStopped = false
 
 			var err error
 			block.Transactions, err = transToStr(m.mempool)
 			if err != nil {
-				log.Fatal("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
+				slog.Error("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
+				panic(-3)
 			}
 			block.Timestamp = time.Now().Unix()
 			block.Nonce = 0
 
 		// New block added, block is reseting
 		case payload := <-m.InReset:
-			log.Println("[Miner] New transaction recieved")
+			slog.Info("[Miner] New transaction pool and block recieved")
 			m.prevBlock = payload.Block
 			m.mempool = payload.NewTsx
 			m.isStopped = false
@@ -71,7 +72,8 @@ func (m *Miner) ListenAndMine() {
 			var err error
 			block.Transactions, err = transToStr(m.mempool)
 			if err != nil {
-				log.Fatal("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
+				slog.Error("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
+				panic(-3)
 			}
 			block.Timestamp = time.Now().Unix()
 			block.PrevHash = m.prevBlock.Hash
@@ -87,14 +89,15 @@ func (m *Miner) ListenAndMine() {
 
 			blockJson, err := block.SerializeWithoutHash()
 			if err != nil {
-				log.Fatal("[Miner] Marshaling block failed misreably. Miner cannot run anymore")
+				slog.Error("[Miner] Marshaling block failed misreably. Miner cannot run anymore")
+				panic(-3)
 			}
 
 			blockHash := hash(blockJson)
 			if strings.HasPrefix(blockHash, prefix) {
 				block.Hash = blockHash
 
-				log.Printf("\nNew Block mined\nId: %d Hash: %s\n\n", block.Index, block.Hash[:10])
+				slog.Info("New blck mined", "id", block.Index, "hash", block.Hash[:12])
 				m.mempool = m.mempool[:0]
 				m.prevBlock = block
 				m.OutBlock <- block
