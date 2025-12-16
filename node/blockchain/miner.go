@@ -48,9 +48,14 @@ func (m *Miner) ListenAndMine() {
 		case newTx := <-m.InTx:
 			slog.Info("[Miner] New transaction recieved")
 			m.mempool = append(m.mempool, newTx)
-			// if len(m.mempool) == 1 {
-			// 	m.mempool = append(m.mempool, Coinbase(newTx.Sender))
-			// }
+			if len(m.mempool) == 1 {
+				coinbase, err := Coinbase(newTx.Sender)
+				if err != nil {
+					slog.Error("[Miner] Failed to create coinbase", "err", err)
+					continue
+				}
+				m.mempool = append(m.mempool, coinbase)
+			}
 			m.isStopped = false
 
 			var err error

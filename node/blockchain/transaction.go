@@ -28,18 +28,31 @@ type Transaction struct {
 }
 
 // TODO: dodać walidaje, tak aby nie można było dodawać coinbase w nieskończoność
-func Coinbase(reciever string) Transaction {
+func Coinbase(reciever string) (Transaction, error) {
 	coinbase := Transaction{
 		Sender:    COINBASE_PK,
 		Reciever:  reciever,
-		Ammount:   10.0,
+		Ammount:   2.0,
 		Timestamp: int(time.Now().Unix()),
 	}
-	hashed, _ := coinbase.Hash()
-	privKey, _ := pemToPrivateKey(COINBASE_SK)
-	sign, _ := ecdsa.SignASN1(rand.Reader, privKey, []byte(hashed))
+
+	hashed, err := coinbase.Hash()
+	if err != nil {
+		return coinbase, errors.New("Failed to hash coinbase ¯\\_(ツ)_/¯")
+	}
+
+	privKey, err := pemToPrivateKey(COINBASE_SK)
+	if err != nil {
+		return coinbase, fmt.Errorf("Failed to do SK conversion ಠ_ಠ, sorry: %s", err)
+	}
+
+	sign, err := ecdsa.SignASN1(rand.Reader, privKey, []byte(hashed))
+	if err != nil {
+		return coinbase, fmt.Errorf("Signing went wrong: %s", err)
+	}
 	coinbase.Signature = string(sign)
-	return coinbase
+
+	return coinbase, nil
 }
 
 func (t *Transaction) Serialize() ([]byte, error) {
@@ -148,10 +161,15 @@ func pemToPrivateKey(pemKey string) (*ecdsa.PrivateKey, error) {
 		return nil, fmt.Errorf("Failed to decode PEM block, rest: %s", rest)
 	}
 
-	privKey, err := x509.ParseECPrivateKey(block.Bytes)
+	genericPrvKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse DER public key: %v", err)
 	}
 
-	return privKey, nil
+	ecdsaPrvKey, ok := genericPrvKey.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("Key is not an ECDSA private key")
+	}
+
+	return ecdsaPrvKey, nil
 }
