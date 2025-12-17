@@ -74,7 +74,7 @@ func (b *Block) CreateHash() (string, error) {
 }
 
 func (b *Block) GetTransactions() ([]Transaction, error) {
-	return strToTrans(b.Transactions)
+	return strToTxs(b.Transactions)
 }
 
 var Genesis = Block{

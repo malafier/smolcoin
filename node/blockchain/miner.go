@@ -44,7 +44,7 @@ func (m *Miner) ListenAndMine() {
 	// Mining loop
 	for {
 		select {
-		// New transaction
+		// Add transaction
 		case newTx := <-m.InTx:
 			slog.Info("[Miner] New transaction recieved")
 			m.mempool = append(m.mempool, newTx)
@@ -59,7 +59,7 @@ func (m *Miner) ListenAndMine() {
 			m.isStopped = false
 
 			var err error
-			block.Transactions, err = transToStr(m.mempool)
+			block.Transactions, err = txsToStr(m.mempool)
 			if err != nil {
 				slog.Error("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
 				panic(-3)
@@ -75,7 +75,7 @@ func (m *Miner) ListenAndMine() {
 			m.isStopped = false
 
 			var err error
-			block.Transactions, err = transToStr(m.mempool)
+			block.Transactions, err = txsToStr(m.mempool)
 			if err != nil {
 				slog.Error("[Miner] Parsing transactions failed misreably. Miner cannot run anymore")
 				panic(-3)
@@ -102,9 +102,7 @@ func (m *Miner) ListenAndMine() {
 			if strings.HasPrefix(blockHash, prefix) {
 				block.Hash = blockHash
 
-				slog.Info("New blck mined", "id", block.Index, "hash", block.Hash[:12])
-				m.mempool = m.mempool[:0]
-				m.prevBlock = block
+				slog.Info("New blck mined", "id", block.Index, "hash", block.Hash[:16])
 				m.OutBlock <- block
 				block = &Block{}
 			}
@@ -118,7 +116,7 @@ func (m *Miner) MempoolContains(txHash string) bool {
 	defer m.mu.Unlock()
 	hashes := make([]string, len(m.mempool))
 	for i, tx := range m.mempool {
-		hashes[i], _ = tx.Hash() // This ignores possible error, becouse transaction should be checked muliple times at this point
+		hashes[i], _ = tx.HashStr() // This ignores possible error, becouse transaction should be checked muliple times at this point
 	}
 	return slices.Contains(hashes, txHash)
 }
