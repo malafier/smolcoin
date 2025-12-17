@@ -91,13 +91,13 @@ func (s *Server) handleGetPeers(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 	var req bc.Transaction
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		slog.Error("Failed to decode request", "err", err)
+		slog.Error("[Node] Failed to decode request", "err", err)
 		respondWithError(w, http.StatusBadRequest, "Invalid data.")
 		return
 	}
 	defer r.Body.Close()
 
-	slog.Info("Recieved new transactionn", "tx", req.String())
+	slog.Info("[Node] Recieved new transactionn", "tx", req.String())
 
 	err := s.State.AddTransaction(req)
 	if err != nil {
@@ -132,7 +132,7 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	}
 	host, port, err := parsePeer(initialPeer)
 	if err != nil {
-		slog.Error("Invalid initial peer address", "err", err.Error())
+		slog.Error("[Node] Invalid initial peer address", "err", err.Error())
 		return
 	}
 
@@ -143,7 +143,7 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 	if _, err := client.Do(req); err == nil {
 		s.State.AddPeer(host, port)
 	} else {
-		slog.Error("Failed to connect to peer", "peer", initialPeer, "err", err)
+		slog.Error("[Node] Failed to connect to peer", "peer", initialPeer, "err", err)
 	}
 }
 
