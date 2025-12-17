@@ -104,8 +104,9 @@ func (ns *NodeState) PeerCount() int {
 // TODO: dodać walidacje hashy transakcji w bloku -- czy się nie powtarzają
 // dodać walidacje wszystkich transakcji
 func (ns *NodeState) AddBlock(block *bc.Block) error {
-	if !block.IsValid() {
-		return errors.New("Given block is not valid")
+	err := block.Validate()
+	if err != nil {
+		return fmt.Errorf("Block invalid: %s", err.Error())
 	}
 
 	ns.chainLock.Lock()
@@ -123,12 +124,13 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	if strings.HasPrefix(block.Hash, prefix) {
 		return errors.New("Prefix not long enough")
 	}
+	slog.Debug("Block validated", "hash", block.Hash)
 
 	txs, _ := block.GetTransactions()
 	for _, tx := range txs {
-		txHash, err := tx.Hash()
+		txHash, err := tx.HashStr()
 		if err != nil {
-			return errors.New("Transaction invalid")
+			return errors.New("Transaction in block is invalid")
 		}
 		inBlock, ok := ns.txHistory[txHash]
 		if inBlock && ok {
@@ -141,9 +143,11 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 
 		ns.txHistory[txHash] = true
 	}
+	slog.Debug("Transactions in block validated", "hash", block.Hash)
 
 	// Appeding
 	ns.blockchain = append(ns.blockchain, *block)
+	slog.Debug("Block added to blockchain", "hash", block.Hash)
 
 	// Reseting miner
 	if ns.miner != nil {
@@ -161,11 +165,15 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 			Block:  block,
 			NewTsx: newMempool,
 		}
+
+		slog.Debug("Miner reset with new block", "hash", block.Hash)
 	}
 
 	ns.UpdateLedger()
 	payload, _ := block.Serialize()
-	go ns.broadcast("block", payload)
+	ns.broadcast("block", payload)
+	slog.Debug("Block broadcasted")
+
 	return nil
 }
 
@@ -175,7 +183,7 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 		return fmt.Errorf("Transaction invalid: %s", err)
 	}
 
-	hash, err := tx.Hash()
+	hash, err := tx.HashStr()
 	if err != nil {
 		return errors.New("Something went wrong with transaction. Sorry")
 	}
@@ -183,6 +191,7 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 	if ok {
 		return errors.New("Transaction already registered")
 	}
+
 	ledger := ns.ledgerWithMempool()
 	record := ledger[tx.SenderId()]
 	if record-tx.Ammount < 0.0 {
@@ -260,7 +269,10 @@ func (ns *NodeState) Mine() {
 	slog.Info("[Node] Waiting for miner...")
 	for block := range ns.miner.OutBlock {
 		slog.Info("Mined new block", "hash", block.Hash[:16])
-		ns.AddBlock(block)
+		err := ns.AddBlock(block)
+		if err != nil {
+			slog.Error("[Node] Could not add MY own block", "err", err.Error())
+		}
 	}
 }
 
@@ -301,7 +313,7 @@ func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
 	}
 	defer resp.Body.Close()
 
-	slog.Info(fmt.Sprintf("  - Sent to %s (Status: %s)\n", peer.Addr(), resp.Status))
+	slog.Info(fmt.Sprintf("  - Sent to %s (Status: %s)", peer.Addr(), resp.Status))
 }
 
 func (ns *NodeState) ledgerWithMempool() map[string]float64 {
