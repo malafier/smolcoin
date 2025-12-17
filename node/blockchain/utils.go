@@ -12,7 +12,7 @@ func hash(data []byte) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func transToStr(transactions []Transaction) (string, error) {
+func txsToStr(transactions []Transaction) (string, error) {
 	byteTrans, err := json.Marshal(transactions)
 	if err != nil {
 		return "", err
@@ -20,7 +20,7 @@ func transToStr(transactions []Transaction) (string, error) {
 	return string(byteTrans), nil
 }
 
-func strToTrans(str string) ([]Transaction, error) {
+func strToTxs(str string) ([]Transaction, error) {
 	var parsed []Transaction
 	err := json.Unmarshal([]byte(str), &parsed)
 	if err != nil {
