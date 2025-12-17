@@ -3,7 +3,7 @@ package blockchain
 import (
 	"encoding/json"
 	"errors"
-	"log/slog"
+	"fmt"
 )
 
 type Block struct {
@@ -15,24 +15,32 @@ type Block struct {
 	Hash         string `json:"hash"`
 }
 
-func (b *Block) IsValid() bool {
-	if b.Hash != "" {
-		return false
+func (b *Block) Validate() error {
+	if b.Hash == "" {
+		return errors.New("Hash is empty")
 	}
 
 	blockJson, err := b.SerializeWithoutHash()
 	if err != nil {
-		slog.Error("Failed to mashal a block.")
-		return false
+		return errors.New("Failed to mashal a block.")
 	}
 
-	_, err = strToTrans(b.Transactions)
+	txs, err := strToTxs(b.Transactions)
 	if err != nil {
-		slog.Error("Failed to parse transactions")
-		return false
+		return errors.New("Failed to parse transactions")
 	}
 
-	return hash(blockJson) == b.Hash
+	for _, tx := range txs {
+		if err := tx.Validate(); err != nil {
+			return fmt.Errorf("Transaction in block is invalid: %s", err.Error())
+		}
+	}
+
+	if hash(blockJson) != b.Hash {
+		return errors.New("Hashes are not matching")
+	}
+
+	return nil
 }
 
 func (b *Block) ParseTransactions() ([]Transaction, error) {
