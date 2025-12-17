@@ -36,7 +36,7 @@ func Coinbase(reciever string) (Transaction, error) {
 		Timestamp: int(time.Now().Unix()),
 	}
 
-	hashed, err := coinbase.Hash()
+	hashed, err := coinbase.HashByte()
 	if err != nil {
 		return coinbase, errors.New("Failed to hash coinbase ¯\\_(ツ)_/¯")
 	}
@@ -46,7 +46,7 @@ func Coinbase(reciever string) (Transaction, error) {
 		return coinbase, fmt.Errorf("Failed to do SK conversion ಠ_ಠ, sorry: %s", err)
 	}
 
-	sign, err := ecdsa.SignASN1(rand.Reader, privKey, []byte(hashed))
+	sign, err := ecdsa.SignASN1(rand.Reader, privKey, hashed)
 	if err != nil {
 		return coinbase, fmt.Errorf("Signing went wrong: %s", err)
 	}
@@ -74,12 +74,21 @@ func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 	return json.Marshal(data)
 }
 
-func (t *Transaction) Hash() (string, error) {
+func (t *Transaction) HashByte() ([]byte, error) {
+	serialized, err := t.SerializeWithoutSign()
+	if err != nil {
+		return serialized, err
+	}
+	hashed := sha256.Sum256(serialized)
+	return hashed[:], nil
+}
+
+func (t *Transaction) HashStr() (string, error) {
 	serialized, err := t.SerializeWithoutSign()
 	if err != nil {
 		return "", err
 	}
-	return hash(serialized), err
+	return hash(serialized), nil
 }
 
 func (t *Transaction) String() string {
