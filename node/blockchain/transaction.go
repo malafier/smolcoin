@@ -111,7 +111,7 @@ func (t *Transaction) Validate() error {
 	hashedData := sha256.Sum256(serializedData)
 	signByte, err := hex.DecodeString(t.Signature)
 	if err != nil {
-		return errors.New("Wrong signature")
+		return fmt.Errorf("Wrong signature: %s", err.Error())
 	}
 
 	if !ecdsa.VerifyASN1(publicKey, hashedData[:], signByte) {
