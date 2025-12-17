@@ -14,6 +14,8 @@ import (
 	bc "node/blockchain"
 )
 
+const MAX_SMOLCOINS float64 = 100.0
+
 type Peer struct {
 	Host string `json:"host"`
 	Port int    `json:"port"`
@@ -32,12 +34,12 @@ type NodeState struct {
 	// blockchain
 	blockchain []bc.Block
 	ledger     map[string]float64
-	chainLock  sync.RWMutex
 	txHistory  map[string]bool
+	chainLock  sync.RWMutex
 
 	// Peers
 	Peers     map[string]Peer
-	PeersLock sync.RWMutex
+	peersLock sync.RWMutex
 
 	miner *bc.Miner
 }
@@ -69,23 +71,23 @@ func (ns *NodeState) AddPeer(host string, port int) error {
 		return errors.New("Cannot add self as peer.")
 	}
 
-	ns.PeersLock.Lock()
+	ns.peersLock.Lock()
+	defer ns.peersLock.Unlock()
 	ns.Peers[addr] = newPeer
-	ns.PeersLock.Unlock()
 
 	slog.Info("[Node] Added new peer", "peer", addr)
 	return nil
 }
 
 func (ns *NodeState) RemovePeer(peer Peer) {
-	ns.PeersLock.Lock()
-	defer ns.PeersLock.Unlock()
+	ns.peersLock.Lock()
+	defer ns.peersLock.Unlock()
 	delete(ns.Peers, peer.Addr())
 }
 
 func (ns *NodeState) PeersList() []Peer {
-	ns.PeersLock.RLock()
-	defer ns.PeersLock.RUnlock()
+	ns.peersLock.RLock()
+	defer ns.peersLock.RUnlock()
 
 	peerList := make([]Peer, 0, len(ns.Peers))
 	for _, peer := range ns.Peers {
@@ -96,13 +98,11 @@ func (ns *NodeState) PeersList() []Peer {
 }
 
 func (ns *NodeState) PeerCount() int {
-	ns.PeersLock.RLock()
-	defer ns.PeersLock.RUnlock()
+	ns.peersLock.RLock()
+	defer ns.peersLock.RUnlock()
 	return len(ns.Peers)
 }
 
-// TODO: dodać walidacje hashy transakcji w bloku -- czy się nie powtarzają
-// dodać walidacje wszystkich transakcji
 func (ns *NodeState) AddBlock(block *bc.Block) error {
 	err := block.Validate()
 	if err != nil {
@@ -110,7 +110,6 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	}
 
 	ns.chainLock.Lock()
-	defer ns.chainLock.Unlock()
 
 	// Validation
 	lastBlock := ns.blockchain[len(ns.blockchain)-1]
@@ -121,7 +120,7 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 		return errors.New("Hash mismatch")
 	}
 	prefix := strings.Repeat("0", ns.Difficulty)
-	if strings.HasPrefix(block.Hash, prefix) {
+	if !strings.HasPrefix(block.Hash, prefix) {
 		return errors.New("Prefix not long enough")
 	}
 	slog.Debug("Block validated", "hash", block.Hash)
@@ -143,11 +142,12 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 
 		ns.txHistory[txHash] = true
 	}
-	slog.Debug("Transactions in block validated", "hash", block.Hash)
+	slog.Debug("Transactions in block validated", "hash", block.Hash[:16])
 
 	// Appeding
 	ns.blockchain = append(ns.blockchain, *block)
-	slog.Debug("Block added to blockchain", "hash", block.Hash)
+	ns.chainLock.Unlock()
+	slog.Debug("Block added to blockchain", "hash", block.Hash[:16])
 
 	// Reseting miner
 	if ns.miner != nil {
@@ -166,13 +166,15 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 			NewTsx: newMempool,
 		}
 
-		slog.Debug("Miner reset with new block", "hash", block.Hash)
+		slog.Debug("Miner reset with new block", "hash", block.Hash[:16])
 	}
 
 	ns.UpdateLedger()
-	payload, _ := block.Serialize()
-	ns.broadcast("block", payload)
-	slog.Debug("Block broadcasted")
+	payload, err := block.Serialize()
+	if err != nil {
+		return fmt.Errorf("Failed to serialize new block. Unable to broadcast: %s", err.Error())
+	}
+	go ns.broadcast("block", payload)
 
 	return nil
 }
@@ -194,8 +196,11 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 
 	ledger := ns.ledgerWithMempool()
 	record := ledger[tx.SenderId()]
-	if record-tx.Ammount < 0.0 {
-		return errors.New("Cannot send more coins than what you have")
+	if tx.SenderId() == bc.COINBASE_LOGIN && (tx.Ammount != bc.COINS_TO_GIVE || record-tx.Ammount < -MAX_SMOLCOINS) {
+		return errors.New("Max ammount of smolcoins already reached or wrong amount of coins given")
+	}
+	if tx.SenderId() != bc.COINBASE_LOGIN && record-tx.Ammount < 0 {
+		return errors.New("Cannot send more coins than what they have")
 	}
 
 	if ns.miner != nil {
@@ -220,8 +225,8 @@ func (ns *NodeState) UpdateLedger() {
 	ledger := make(map[string]float64)
 	for _, block := range ns.blockchain {
 		tsx, err := block.ParseTransactions()
-		if err != nil {
-			slog.Info("Failed to parse transactions for some reason")
+		if err != nil && block.Index != 0 {
+			slog.Error("Failed to parse transactions for some reason")
 			continue
 		}
 

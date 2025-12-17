@@ -116,13 +116,15 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	slog.Info("[Node] Recieved new block", "block", req.Hash[:16])
+
 	if err := s.State.AddBlock(req); err != nil {
 		slog.Info("[Node] Block declined", "err", err.Error())
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Block declined: %s.", err.Error()))
 		return
 	}
 
-	slog.Info("[Node] Recieved new block", "hash", req.Hash[:10])
+	slog.Info("[Node] New block added to chain", "hash", req.Hash[:16])
 	respondWithMessage(w, http.StatusAccepted, "Block added to chain")
 }
 
@@ -161,7 +163,7 @@ func (s *Server) Start() {
 	handlerWithMiddleware := s.checkPeerHeader(router)
 
 	serverAddr := s.State.Addr()
-	slog.Debug(fmt.Sprintf("[Node] Starting node on http://%s\n", serverAddr))
+	slog.Debug(fmt.Sprintf("[Node] Starting node on http://%s", serverAddr))
 	if err := http.ListenAndServe(serverAddr, handlerWithMiddleware); err != nil {
 		slog.Error("Failed to start server", "err", err)
 	}

@@ -32,22 +32,33 @@ func NewMiner(difficlty int) *Miner {
 		OutBlock:   make(chan *Block),
 		mempool:    []Transaction{},
 		difficulty: difficlty,
+		prevBlock:  &Genesis,
 	}
 }
 
 func (m *Miner) ListenAndMine() {
 	prefix := strings.Repeat("0", m.difficulty)
+	block := &Block{
+		Index:    1,
+		PrevHash: m.prevBlock.Hash,
+	}
 	slog.Debug("[Miner] Started mining...")
-
-	block := &Block{}
 
 	// Mining loop
 	for {
+		if block == nil {
+			block = &Block{}
+		}
+
 		select {
 		// Add transaction
 		case newTx := <-m.InTx:
 			slog.Info("[Miner] New transaction recieved")
 			m.mempool = append(m.mempool, newTx)
+			if block == nil {
+				continue
+			}
+
 			if len(m.mempool) == 1 {
 				coinbase, err := Coinbase(newTx.Sender)
 				if err != nil {
@@ -82,12 +93,13 @@ func (m *Miner) ListenAndMine() {
 			}
 			block.Timestamp = time.Now().Unix()
 			block.PrevHash = m.prevBlock.Hash
-			block.Index = m.prevBlock.Index
+			block.Index = m.prevBlock.Index + 1
 			block.Nonce = 0
 
 		// Mining
 		default:
-			if len(m.mempool) == 0 || len(block.Transactions) == 0 || m.isStopped {
+			notMemorySafe := block == nil || m.prevBlock == nil
+			if notMemorySafe || len(m.mempool) == 0 || len(block.Transactions) == 0 || m.isStopped {
 				time.Sleep(100 * time.Microsecond)
 				continue
 			}
@@ -104,7 +116,10 @@ func (m *Miner) ListenAndMine() {
 
 				slog.Info("New blck mined", "id", block.Index, "hash", block.Hash[:16])
 				m.OutBlock <- block
-				block = &Block{}
+				m.mempool = m.mempool[:0]
+				m.prevBlock = nil
+				block = nil
+				continue
 			}
 			block.Nonce++
 		}
