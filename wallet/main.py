@@ -25,7 +25,6 @@ def main():
         print("Failed to decrypt file.")
         exit(1)
 
-    print(keys)
     app = App(password, keys, path, node_adr)
     app.run()
 
