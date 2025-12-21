@@ -255,6 +255,7 @@ func (ns *NodeState) GetLedger() map[string]float64 {
 	return ns.ledger
 }
 
+// TODO: sort things out with ids and PKs
 func (ns *NodeState) AddId(id string) {
 	ns.chainLock.Lock()
 	defer ns.chainLock.Unlock()
