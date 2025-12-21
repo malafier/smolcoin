@@ -281,6 +281,12 @@ func (ns *NodeState) Mine() {
 	}
 }
 
+func (ns *NodeState) GetChain() []bc.Block {
+	ns.chainLock.RLock()
+	defer ns.chainLock.RUnlock()
+	return ns.blockchain
+}
+
 func (ns *NodeState) broadcast(uri string, payload []byte) {
 	peerList := ns.PeersList()
 	slog.Info(fmt.Sprintf("[Node] Broadcasting message to %d peer(s)...", len(peerList)))

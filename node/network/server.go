@@ -128,6 +128,23 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 	respondWithMessage(w, http.StatusAccepted, "Block added to chain")
 }
 
+func (s *Server) handleGetChain(w http.ResponseWriter, r *http.Request) {
+	chain := s.State.GetChain()
+	chainStr, err := json.Marshal(chain)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		slog.Error("Failed to marshall own block chain")
+		return
+	}
+
+	msg := map[string]string{
+		"length": strconv.Itoa(len(chain)),
+		"chain":  string(chainStr),
+	}
+	slog.Info("[Node] Block chain sent")
+	respondWithJSON(w, http.StatusOK, msg)
+}
+
 func (s *Server) connectToInitialPeer(initialPeer string) {
 	if initialPeer == "" {
 		return
