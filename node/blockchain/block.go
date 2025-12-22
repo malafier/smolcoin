@@ -2,8 +2,9 @@ package blockchain
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+
+	crypto "node/cryptography"
 )
 
 type Block struct {
@@ -17,17 +18,17 @@ type Block struct {
 
 func (b *Block) Validate() error {
 	if b.Hash == "" {
-		return errors.New("Hash is empty")
+		return ErrEmptyHash
 	}
 
 	blockJson, err := b.SerializeWithoutHash()
 	if err != nil {
-		return errors.New("Failed to mashal a block.")
+		return ErrBlockMarshal
 	}
 
 	txs, err := strToTxs(b.Transactions)
 	if err != nil {
-		return errors.New("Failed to parse transactions")
+		return ErrTransactionParse
 	}
 
 	for _, tx := range txs {
@@ -36,8 +37,8 @@ func (b *Block) Validate() error {
 		}
 	}
 
-	if hash(blockJson) != b.Hash {
-		return errors.New("Hashes are not matching")
+	if crypto.HashStr(blockJson) != b.Hash {
+		return ErrHashMismatch
 	}
 
 	return nil
@@ -76,9 +77,9 @@ func (b *Block) SerializeWithoutHash() ([]byte, error) {
 func (b *Block) CreateHash() (string, error) {
 	blockJson, err := b.SerializeWithoutHash()
 	if err != nil {
-		return "", errors.New("Failed to mashal a block.")
+		return "", ErrBlockMarshal
 	}
-	return hash(blockJson), nil
+	return crypto.HashStr(blockJson), nil
 }
 
 func (b *Block) GetTransactions() ([]Transaction, error) {

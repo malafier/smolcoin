@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
+
+	crypto "node/cryptography"
 )
 
 type Transaction struct {
@@ -55,7 +54,7 @@ func (t *Transaction) HashStr() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return hash(serialized), nil
+	return crypto.HashStr(serialized), nil
 }
 
 func (t *Transaction) String() string {
@@ -71,23 +70,23 @@ func (t *Transaction) String() string {
 
 func (t *Transaction) Validate() error {
 	if t.Ammount < 0.0 {
-		return errors.New("Cannot send minus coins")
+		return ErrNegativeAmmountGiven
 	}
 
 	// Signature verification
-	publicKey, err := pemToPublicKey(t.Sender)
+	publicKey, err := crypto.PemToPublicKey(t.Sender)
 	if err != nil {
 		return errors.New("Failed to recieve public key from login")
 	}
 
 	serializedData, err := t.SerializeWithoutSign()
 	if err != nil {
-		return errors.New("Serialization failed")
+		return ErrTxFailedSerialization
 	}
 	hashedData := sha256.Sum256(serializedData)
 	signByte, err := hex.DecodeString(t.Signature)
 	if err != nil {
-		return fmt.Errorf("Wrong signature: %s", err.Error())
+		return ErrSignatureInvalid
 	}
 
 	if !ecdsa.VerifyASN1(publicKey, hashedData[:], signByte) {
@@ -97,7 +96,7 @@ func (t *Transaction) Validate() error {
 			"sing", t.Signature,
 			"msg", string(serializedData),
 		)
-		return errors.New("Signature invalid")
+		return ErrSignatureInvalid
 	}
 	return nil
 }
@@ -108,44 +107,4 @@ func (t *Transaction) SenderId() string {
 
 func (t *Transaction) RecieverId() string {
 	return keyAsId(t.Reciever)
-}
-
-func pemToPublicKey(pemKey string) (*ecdsa.PublicKey, error) {
-	trimedBytes := []byte(strings.TrimSpace(pemKey))
-	block, rest := pem.Decode(trimedBytes)
-	if block == nil || block.Type != "PUBLIC KEY" {
-		return nil, fmt.Errorf("Failed to decode PEM block, rest: %s", rest)
-	}
-
-	genericPubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse DER public key: %v", err)
-	}
-
-	ecdsaPubKey, ok := genericPubKey.(*ecdsa.PublicKey)
-	if !ok {
-		return nil, errors.New("Key is not an ECDSA public key")
-	}
-
-	return ecdsaPubKey, nil
-}
-
-func pemToPrivateKey(pemKey string) (*ecdsa.PrivateKey, error) {
-	trimedBytes := []byte(strings.TrimSpace(pemKey))
-	block, rest := pem.Decode(trimedBytes)
-	if block == nil || block.Type != "PRIVATE KEY" {
-		return nil, fmt.Errorf("Failed to decode PEM block, rest: %s", rest)
-	}
-
-	genericPrvKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse DER public key: %v", err)
-	}
-
-	ecdsaPrvKey, ok := genericPrvKey.(*ecdsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("Key is not an ECDSA private key")
-	}
-
-	return ecdsaPrvKey, nil
 }

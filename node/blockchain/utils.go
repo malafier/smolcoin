@@ -7,11 +7,6 @@ import (
 	"strings"
 )
 
-func hash(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
-}
-
 func txsToStr(transactions []Transaction) (string, error) {
 	byteTrans, err := json.Marshal(transactions)
 	if err != nil {
