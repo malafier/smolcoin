@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	crypto "node/cryptography"
 )
 
 const COINBASE_SK string = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgKkNOqe9c7AZHMNq7\n9wocbkYRvKzn5zDAJ8jgayQBWXehRANCAASfT/1IUVW46ai4Ow7isYzPQwa9Vf2U\nDseGuR4CeDMSO/bhYGp+wVz51XdcGdwoR8ypf6l8o8gWUF7lFy8M37g9\n-----END PRIVATE KEY-----\n"
@@ -28,7 +30,7 @@ func Coinbase(reciever string) (Transaction, error) {
 		return coinbase, errors.New("Failed to hash coinbase ¯\\_(ツ)_/¯")
 	}
 
-	privKey, err := pemToPrivateKey(COINBASE_SK)
+	privKey, err := crypto.PemToPrivateKey(COINBASE_SK)
 	if err != nil {
 		return coinbase, fmt.Errorf("Failed to do SK conversion ಠ_ಠ, sorry: %s", err)
 	}
