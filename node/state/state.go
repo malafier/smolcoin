@@ -310,6 +310,7 @@ func (c *ChainNet) Validate() error {
 	return nil
 }
 
+// TODO: use it
 func (ns *NodeState) sync() {
 	ns.peersLock.RLock()
 	peers := ns.Peers
