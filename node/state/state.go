@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -109,7 +110,43 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	}
 
 	ns.chainLock.Lock()
+	if err := ns.doAddBlock(block); err != nil {
+		return err
+	}
+	ns.chainLock.Unlock()
+	slog.Debug("Block added to blockchain", "hash", block.Hash[:16])
 
+	// Reseting miner
+	if ns.miner != nil {
+		mempool := ns.miner.GetMempool()
+		ns.miner.Stop()
+		txs, _ := block.GetTransactions()
+		var newMempool []bc.Transaction
+		for _, tx := range mempool {
+			if !slices.Contains(txs, tx) {
+				newMempool = append(newMempool, tx)
+			}
+		}
+
+		ns.miner.InReset <- bc.NetPayload{
+			Block:  block,
+			NewTsx: newMempool,
+		}
+
+		slog.Debug("Miner reset with new block", "hash", block.Hash[:16])
+	}
+
+	ns.UpdateLedger()
+	payload, err := block.Serialize()
+	if err != nil {
+		return fmt.Errorf("Failed to serialize new block. Unable to broadcast: %s", err.Error())
+	}
+	go ns.broadcast("block", payload)
+
+	return nil
+}
+
+func (ns *NodeState) doAddBlock(block *bc.Block) error {
 	// Validation
 	lastBlock := ns.blockchain[len(ns.blockchain)-1]
 	if lastBlock.Index+1 != block.Index {
@@ -145,36 +182,6 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 
 	// Appeding
 	ns.blockchain = append(ns.blockchain, *block)
-	ns.chainLock.Unlock()
-	slog.Debug("Block added to blockchain", "hash", block.Hash[:16])
-
-	// Reseting miner
-	if ns.miner != nil {
-		mempool := ns.miner.GetMempool()
-		ns.miner.Stop()
-		txs, _ := block.GetTransactions()
-		var newMempool []bc.Transaction
-		for _, tx := range mempool {
-			if !slices.Contains(txs, tx) {
-				newMempool = append(newMempool, tx)
-			}
-		}
-
-		ns.miner.InReset <- bc.NetPayload{
-			Block:  block,
-			NewTsx: newMempool,
-		}
-
-		slog.Debug("Miner reset with new block", "hash", block.Hash[:16])
-	}
-
-	ns.UpdateLedger()
-	payload, err := block.Serialize()
-	if err != nil {
-		return fmt.Errorf("Failed to serialize new block. Unable to broadcast: %s", err.Error())
-	}
-	go ns.broadcast("block", payload)
-
 	return nil
 }
 
@@ -219,7 +226,10 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 func (ns *NodeState) UpdateLedger() {
 	ns.chainLock.Lock()
 	defer ns.chainLock.Unlock()
+	ns.doUpdateLedger()
+}
 
+func (ns *NodeState) doUpdateLedger() {
 	ledger := make(map[string]float64)
 	for _, block := range ns.blockchain {
 		tsx, err := block.ParseTransactions()
@@ -284,6 +294,137 @@ func (ns *NodeState) GetChain() []bc.Block {
 	ns.chainLock.RLock()
 	defer ns.chainLock.RUnlock()
 	return ns.blockchain
+}
+
+type ChainNet struct {
+	Chain []bc.Block `json:"chain"`
+	Len   int        `json:"length"`
+}
+
+func (c *ChainNet) Validate() error {
+	for _, block := range c.Chain {
+		if err := block.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ns *NodeState) sync() {
+	ns.peersLock.RLock()
+	peers := ns.Peers
+	ns.peersLock.RUnlock()
+
+	chains := make([]*ChainNet, 0)
+
+	for _, peer := range peers {
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/chain", peer.Addr()), nil)
+		if err != nil {
+			slog.Warn("Failed to connect to peer for block synchronization")
+			continue
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Peer", ns.Addr())
+
+		client := http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			ns.RemovePeer(peer)
+			slog.Warn("Failed to get sync responce. Peer removed", "peer", peer.Addr())
+			continue
+		}
+
+		defer resp.Body.Close()
+		var chain ChainNet
+		if err := json.NewDecoder(resp.Body).Decode(&chain); err != nil {
+			slog.Error("Failed to decode chain", "err", err)
+			continue
+		}
+
+		chains = append(chains, &chain)
+	}
+
+	ns.chainLock.Lock()
+	defer ns.chainLock.Unlock()
+	myChainLen := len(ns.blockchain)
+
+	for i, chain := range chains {
+		// Blockchain is roughly the same - skip
+		if chain.Len == myChainLen && chain.Chain[chain.Len-1].Hash == ns.blockchain[myChainLen].Hash {
+			chains[i] = nil
+			continue
+		}
+
+		// Invalid
+		if chain.Len != len(chain.Chain) {
+			chains[i] = nil
+			continue
+		}
+
+		// Blockchain is shorter - skip
+		if chain.Len < myChainLen {
+			chains[i] = nil
+			continue
+		}
+
+		// Blockchain is longer but not long enough to be trusted - skip for now
+		if chain.Len < myChainLen+6 {
+			chains[i] = nil
+			continue
+		}
+
+		// Blockchain invalid
+		if err := chain.Validate(); err != nil {
+			chains[i] = nil
+		}
+	}
+
+	chains = slices.DeleteFunc(chains, func(c *ChainNet) bool { return c == nil })
+	if len(chains) == 0 {
+		return
+	}
+
+	// TODO: add fallback options with rest of chains
+	slices.SortFunc(chains, func(a, b *ChainNet) int { return b.Len - a.Len })
+	newChain := chains[0]
+	var mempool []bc.Transaction
+	if ns.miner != nil {
+		mempool = ns.miner.GetMempool()
+		ns.miner.Stop()
+	}
+
+	// Genesis must be set
+	if newChain.Chain[0] != bc.Genesis {
+		return
+	}
+
+	clear(ns.txHistory)
+	ns.blockchain = ns.blockchain[:1]
+	for _, block := range ns.blockchain[1:] {
+		ns.doAddBlock(&block)
+	}
+
+	if ns.miner != nil {
+		txsHash := make([]string, len(ns.txHistory))
+		i := 0
+		for hash := range ns.txHistory {
+			txsHash[i] = hash
+			i++
+		}
+
+		newMempool := make([]bc.Transaction, 0)
+		for _, tx := range mempool {
+			hash, _ := tx.HashStr()
+			if !slices.Contains(txsHash, hash) {
+				newMempool = append(newMempool, tx)
+			}
+		}
+		lastBlock := ns.blockchain[len(ns.blockchain)]
+
+		ns.miner.InReset <- bc.NetPayload{Block: &lastBlock, NewTsx: newMempool}
+	}
+	ns.doUpdateLedger()
 }
 
 func (ns *NodeState) broadcast(uri string, payload []byte) {
