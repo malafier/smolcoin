@@ -55,6 +55,7 @@ func (m *Miner) ListenAndMine() {
 		case newTx := <-m.InTx:
 			slog.Info("[Miner] New transaction recieved")
 			m.mempool = append(m.mempool, newTx)
+			m.isStopped = false
 			if block == nil {
 				continue
 			}
@@ -67,7 +68,6 @@ func (m *Miner) ListenAndMine() {
 				}
 				m.mempool = append(m.mempool, coinbase)
 			}
-			m.isStopped = false
 
 			var err error
 			block.Transactions, err = txsToStr(m.mempool)
