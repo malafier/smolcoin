@@ -100,8 +100,7 @@ func (s *Server) handleNewTransaction(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("[Node] Recieved new transactionn", "tx", req.String())
 
-	err := s.State.AddTransaction(req)
-	if err != nil {
+	if err := s.State.AddTransaction(req); err != nil {
 		slog.Info("[Node] Transaction declined", "err", err.Error())
 		respondWithMessage(w, http.StatusAccepted, err.Error())
 		return

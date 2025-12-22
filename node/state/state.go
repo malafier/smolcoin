@@ -104,8 +104,7 @@ func (ns *NodeState) PeerCount() int {
 }
 
 func (ns *NodeState) AddBlock(block *bc.Block) error {
-	err := block.Validate()
-	if err != nil {
+	if err := block.Validate(); err != nil {
 		return fmt.Errorf("Block invalid: %s", err.Error())
 	}
 
@@ -180,8 +179,7 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 }
 
 func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
-	err := tx.Validate()
-	if err != nil {
+	if err := tx.Validate(); err != nil {
 		return fmt.Errorf("Transaction invalid: %s", err)
 	}
 
