@@ -24,25 +24,21 @@ func NewServer(state *state.NodeState, initialPeer string) *Server {
 
 func (s *Server) Start() {
 	router := http.NewServeMux()
-
-	nodeRouter := http.NewServeMux()
-	nodeRouter.HandleFunc("GET /", s.handleIndex)
-	nodeRouter.HandleFunc("GET /users", s.handleGetIds)
-	nodeRouter.HandleFunc("GET /ledger", s.handleGetLedger)
-	nodeRouter.HandleFunc("GET /peers", s.handleGetPeers)
-	nodeRouter.HandleFunc("POST /peer", s.handleAddPeer)
-	nodeRouter.HandleFunc("POST /block", s.handleNewBlock)
-	nodeRouter.HandleFunc("POST /transaction", s.handleNewTransaction)
-	router.Handle("/node/", http.StripPrefix("/node", s.checkPeerHeader(nodeRouter)))
+	router.HandleFunc("GET /", s.handleIndex)
+	router.HandleFunc("GET /users", s.handleGetIds)
+	router.HandleFunc("GET /ledger", s.handleGetLedger)
+	router.HandleFunc("GET /peers", s.handleGetPeers)
+	router.HandleFunc("POST /peer", s.handleAddPeer)
+	router.HandleFunc("POST /block", s.handleNewBlock)
+	router.HandleFunc("POST /transaction", s.handleNewTransaction)
 
 	adminRouter := http.NewServeMux()
-	adminRouter.HandleFunc("POST /connect", nil)
-	adminRouter.HandleFunc("POST /disconnect", nil)
+	adminRouter.HandleFunc("POST /connect", s.handleConnect)
 	router.Handle("/admin/", http.StripPrefix("/admin", s.checkAdmin(adminRouter)))
 
 	server := http.Server{
 		Addr:    s.State.Addr(),
-		Handler: router,
+		Handler: s.checkPeerHeader(router),
 	}
 
 	slog.Debug(fmt.Sprintf("[Node] Starting node on http://%s", server.Addr))
