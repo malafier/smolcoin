@@ -22,6 +22,35 @@ func NewServer(state *state.NodeState, initialPeer string) *Server {
 	return server
 }
 
+func (s *Server) Start() {
+	router := http.NewServeMux()
+
+	nodeRouter := http.NewServeMux()
+	nodeRouter.HandleFunc("GET /", s.handleIndex)
+	nodeRouter.HandleFunc("GET /users", s.handleGetIds)
+	nodeRouter.HandleFunc("GET /ledger", s.handleGetLedger)
+	nodeRouter.HandleFunc("GET /peers", s.handleGetPeers)
+	nodeRouter.HandleFunc("POST /peer", s.handleAddPeer)
+	nodeRouter.HandleFunc("POST /block", s.handleNewBlock)
+	nodeRouter.HandleFunc("POST /transaction", s.handleNewTransaction)
+	router.Handle("/node/", http.StripPrefix("/node", s.checkPeerHeader(nodeRouter)))
+
+	adminRouter := http.NewServeMux()
+	adminRouter.HandleFunc("POST /connect", nil)
+	adminRouter.HandleFunc("POST /disconnect", nil)
+	router.Handle("/admin/", http.StripPrefix("/admin", s.checkAdmin(adminRouter)))
+
+	server := http.Server{
+		Addr:    s.State.Addr(),
+		Handler: router,
+	}
+
+	slog.Debug(fmt.Sprintf("[Node] Starting node on http://%s", server.Addr))
+	if err := server.ListenAndServe(); err != nil {
+		slog.Error("Failed to start server", "err", err)
+	}
+}
+
 func (s *Server) checkPeerHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peerInfo := r.Header.Get("Peer")
@@ -36,6 +65,18 @@ func (s *Server) checkPeerHeader(next http.Handler) http.Handler {
 			return
 		}
 		s.State.AddPeer(host, port)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) checkAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := r.Header.Get("X-Admin-Key")
+		if key != "secret" {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
 
 		next.ServeHTTP(w, r)
 	})
@@ -163,25 +204,5 @@ func (s *Server) connectToInitialPeer(initialPeer string) {
 		s.State.AddPeer(host, port)
 	} else {
 		slog.Error("[Node] Failed to connect to peer", "peer", initialPeer, "err", err)
-	}
-}
-
-func (s *Server) Start() {
-	router := http.NewServeMux()
-
-	router.HandleFunc("GET /", s.handleIndex)
-	router.HandleFunc("GET /users", s.handleGetIds)
-	router.HandleFunc("GET /ledger", s.handleGetLedger)
-	router.HandleFunc("GET /peers", s.handleGetPeers)
-	router.HandleFunc("POST /peer", s.handleAddPeer)
-	router.HandleFunc("POST /block", s.handleNewBlock)
-	router.HandleFunc("POST /transaction", s.handleNewTransaction)
-
-	handlerWithMiddleware := s.checkPeerHeader(router)
-
-	serverAddr := s.State.Addr()
-	slog.Debug(fmt.Sprintf("[Node] Starting node on http://%s", serverAddr))
-	if err := http.ListenAndServe(serverAddr, handlerWithMiddleware); err != nil {
-		slog.Error("Failed to start server", "err", err)
 	}
 }
