@@ -186,6 +186,24 @@ func (s *Server) handleGetChain(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, msg)
 }
 
+func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
+	req := struct {
+		Peer string `json:"peer"`
+	}{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid data.")
+		return
+	}
+	defer r.Body.Close()
+
+	host, port, err := parsePeer(req.Peer)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid data.")
+		return
+	}
+	s.State.AddPeer(host, port)
+}
+
 func (s *Server) connectToInitialPeer(initialPeer string) {
 	if initialPeer == "" {
 		return
