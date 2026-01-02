@@ -1,10 +1,7 @@
 package blockchain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"strings"
 )
 
 func txsToStr(transactions []Transaction) (string, error) {
@@ -22,12 +19,4 @@ func strToTxs(str string) ([]Transaction, error) {
 		return nil, err
 	}
 	return parsed, nil
-}
-
-func keyAsId(key string) string {
-	key = strings.ReplaceAll(key, "-----BEGIN PUBLIC KEY-----", "")
-	key = strings.ReplaceAll(key, "-----END PUBLIC KEY-----", "")
-	key = strings.ReplaceAll(key, "\n", "")
-	key = strings.TrimSpace(key)
-	return key
 }

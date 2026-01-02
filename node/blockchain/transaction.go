@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	crypto "node/cryptography"
 )
@@ -107,4 +108,12 @@ func (t *Transaction) SenderId() string {
 
 func (t *Transaction) RecieverId() string {
 	return keyAsId(t.Reciever)
+}
+
+func keyAsId(key string) string {
+	key = strings.ReplaceAll(key, "-----BEGIN PUBLIC KEY-----", "")
+	key = strings.ReplaceAll(key, "-----END PUBLIC KEY-----", "")
+	key = strings.ReplaceAll(key, "\n", "")
+	key = strings.TrimSpace(key)
+	return key
 }

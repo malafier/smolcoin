@@ -33,6 +33,7 @@ func main() {
 	mine := flag.Bool("M", false, "Flag if node is a miner")
 	flag.Parse()
 
+	// Setup
 	var miner *bc.Miner
 	if *mine {
 		miner = bc.NewMiner(*diff)
@@ -49,5 +50,4 @@ func main() {
 
 // TODO:
 // Wielu górników
-// Obsługa forków oraz orphan block
 // Eksperyment: jak sieć zachowa się, gdy złośliwy węzeł będzie wymuszać tworzenie forków?
