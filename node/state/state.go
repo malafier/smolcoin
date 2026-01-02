@@ -445,7 +445,7 @@ func (ns *NodeState) broadcast(uri string, payload []byte) {
 }
 
 func (ns *NodeState) sendReqToPeer(peer Peer, uri string, payload []byte) {
-	url := fmt.Sprintf("http://%s/node/%s", peer.Addr(), uri)
+	url := fmt.Sprintf("http://%s/%s", peer.Addr(), uri)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
