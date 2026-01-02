@@ -104,13 +104,12 @@ func (m *Miner) ListenAndMine() {
 				continue
 			}
 
-			blockJson, err := block.SerializeWithoutHash()
+			blockHash, err := block.CreateHash()
 			if err != nil {
 				slog.Error("[Miner] Marshaling block failed misreably. Miner cannot run anymore")
 				panic(-3)
 			}
 
-			blockHash := hash(blockJson)
 			if strings.HasPrefix(blockHash, prefix) {
 				block.Hash = blockHash
 
