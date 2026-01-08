@@ -26,6 +26,4 @@ class Transaction:
             "timestamp": self.timestamp,
         }
         tx_str = json.dumps(tx, separators=(",", ":"))
-        print("msg:\n", tx_str)
         self.signature = sign(sk, tx_str).hex()
-        print("sig:\n", self.signature)
