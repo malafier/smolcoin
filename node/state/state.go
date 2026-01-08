@@ -149,6 +149,9 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 func (ns *NodeState) doAddBlock(block *bc.Block) error {
 	// Validation
 	lastBlock := ns.blockchain[len(ns.blockchain)-1]
+	if block.Hash == lastBlock.Hash {
+		return fmt.Errorf("Block is already last in chain")
+	}
 	if lastBlock.Index+1 != block.Index {
 		return errors.New("Indexes mismatch")
 	}
@@ -178,7 +181,7 @@ func (ns *NodeState) doAddBlock(block *bc.Block) error {
 
 		ns.txHistory[txHash] = true
 	}
-	slog.Debug("Transactions in block validated", "hash", block.Hash[:16])
+	slog.Debug("All transactions in block are valid", "hash", block.Hash[:16])
 
 	// Appeding
 	ns.blockchain = append(ns.blockchain, *block)
@@ -194,7 +197,10 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 	if err != nil {
 		return errors.New("Something went wrong with transaction. Sorry")
 	}
+
+	ns.chainLock.RLock()
 	_, ok := ns.txHistory[hash]
+	ns.chainLock.RUnlock()
 	if ok {
 		return errors.New("Transaction already registered")
 	}
@@ -217,6 +223,8 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 		ns.miner.InTx <- tx
 	}
 
+	ns.chainLock.Lock()
+	defer ns.chainLock.Unlock()
 	ns.txHistory[hash] = false
 	payload, _ := tx.Serialize()
 	go ns.broadcast("transaction", payload)
