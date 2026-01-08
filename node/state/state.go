@@ -111,6 +111,7 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 
 	ns.chainLock.Lock()
 	if err := ns.doAddBlock(block); err != nil {
+		ns.chainLock.Unlock()
 		return err
 	}
 	ns.chainLock.Unlock()
