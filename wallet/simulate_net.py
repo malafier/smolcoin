@@ -1,5 +1,8 @@
 import json
 import sys
+import time
+
+from tqdm import tqdm
 
 import src.crypto as crypto
 import src.network as net
@@ -13,15 +16,18 @@ port = 0
 
 
 def send_tx(sk: str, _from: str, _to: str):
+    time.sleep(1)
     tx = Transaction()
     tx.sender = _from
-    tx.reciever = _to
+    tx.receiver = _to
+    tx.timestamp = int(time.time())
     tx.sign(sk)
     net.send_transaction(f"localhost:{port}", tx)
 
 
 def register_in_net(pk: str):
-    net.get_ledger(f"localhost:{port}", pk)
+    resp = net.get_ledger(f"localhost:{port}", pk)
+    print("registered: ", resp)
 
 
 def main():
@@ -36,16 +42,21 @@ def main():
     register_in_net(ala_keys[1])
     register_in_net(bob_keys[1])
 
-    for _ in range(50):
+    for _ in tqdm(range(20)):
         send_tx(ala_keys[0], ala_keys[1], bob_keys[1])
+    print("ala sent her txs")
 
-    for _ in range(20):
+    for _ in tqdm(range(10)):
         send_tx(bob_keys[0], bob_keys[1], ala_keys[1])
+    print("bob sent his txs")
+
+    ledger = net.get_ledger(f"localhost:{port}", ala_keys[1])
+    print("ledger at end:", ledger)
 
     encrypted_ala = crypto.encrypt_data(ala["passwd"], json.dumps(ala_keys))
     encrypted_bob = crypto.encrypt_data(bob["passwd"], json.dumps(bob_keys))
-    save_to_file("ala_storage.json", [encrypted_ala])
-    save_to_file("bob_storage.json", [encrypted_bob])
+    save_to_file("ala_store.json", [encrypted_ala])
+    save_to_file("bob_store.json", [encrypted_bob])
 
 
 if __name__ == "__main__":

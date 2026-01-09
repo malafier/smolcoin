@@ -110,8 +110,8 @@ Smolcoins: {'No info' if self.coins is None else self.coins}
 
         while True:
             transaction_options = [
-                ("reciever", f"Reciever: {'...' + view_key(tx.reciever)[-24:]}"),
-                ("ammount", f"Ammount: {tx.ammount}"),
+                ("reciever", f"Reciever: {'...' + view_key(tx.receiver)[-24:]}"),
+                ("ammount", f"Ammount: {tx.amount}"),
                 ("send", "Send"),
                 ("cancel", "Cancel transaction"),
             ]
@@ -123,12 +123,12 @@ Smolcoins: {'No info' if self.coins is None else self.coins}
 
             if tx_choice == "reciever":
                 reciever_choice = get_possible_ids(self.node_adr)
-                tx.reciever = radiolist_dialog(
+                tx.receiver = radiolist_dialog(
                     title="Chose reciever",
                     values=[(x, x) for x in reciever_choice],
                 ).run()
             elif tx_choice == "ammount":
-                tx.ammount = float(input_dialog(text="Set ammount").run())
+                tx.amount = float(input_dialog(text="Set ammount").run())
             elif tx_choice == "send":
                 break
             elif tx_choice == "cancel":
@@ -158,4 +158,4 @@ Smolcoins: {'No info' if self.coins is None else self.coins}
         ledger = get_ledger(self.node_adr, self.chosen_id[PK])
         if ledger is None:
             return
-        self.coins = float(ledger[view_key(self.chosen_id[PK])])
+        self.coins = float(ledger[self.chosen_id[PK]])
