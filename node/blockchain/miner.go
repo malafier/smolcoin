@@ -142,7 +142,9 @@ func (m *Miner) MempoolContains(txHash string) bool {
 func (m *Miner) GetMempool() []Transaction {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.mempool
+	poolCopy := make([]Transaction, len(m.mempool))
+	copy(poolCopy, m.mempool)
+	return poolCopy
 }
 
 func (m *Miner) Stop() {
