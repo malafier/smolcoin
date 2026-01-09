@@ -54,6 +54,7 @@ func (m *Miner) ListenAndMine() {
 		// Add transaction
 		case newTx := <-m.InTx:
 			slog.Info("[Miner] New transaction recieved")
+			m.mu.Lock()
 			m.mempool = append(m.mempool, newTx)
 			m.isStopped = false
 			if block == nil {
@@ -68,6 +69,7 @@ func (m *Miner) ListenAndMine() {
 				}
 				m.mempool = append(m.mempool, coinbase)
 			}
+			m.mu.Unlock()
 
 			var err error
 			block.Transactions, err = txsToStr(m.mempool)
@@ -81,9 +83,11 @@ func (m *Miner) ListenAndMine() {
 		// New block added, block is reseting
 		case payload := <-m.InReset:
 			slog.Info("[Miner] New transaction pool and block recieved")
+			m.mu.Lock()
 			m.prevBlock = payload.Block
 			m.mempool = payload.NewTsx
 			m.isStopped = false
+			m.mu.Unlock()
 
 			var err error
 			block.Transactions, err = txsToStr(m.mempool)
