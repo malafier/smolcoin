@@ -47,7 +47,3 @@ func main() {
 
 	state.Mine()
 }
-
-// TODO:
-// Wielu górników
-// Eksperyment: jak sieć zachowa się, gdy złośliwy węzeł będzie wymuszać tworzenie forków?
