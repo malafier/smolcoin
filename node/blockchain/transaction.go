@@ -29,7 +29,7 @@ func (t *Transaction) Serialize() ([]byte, error) {
 func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 	data := struct {
 		Sender    string  `json:"sender"`
-		Reciever  string  `json:"reciever"`
+		Reciever  string  `json:"receiver"`
 		Amount    float64 `json:"amount"`
 		Timestamp int     `json:"timestamp"`
 	}{
