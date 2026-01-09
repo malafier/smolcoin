@@ -8,4 +8,5 @@ dependencies = [
     "cryptography>=46.0.3",
     "prompt-toolkit>=3.0.52",
     "requests>=2.32.5",
+    "tqdm>=4.67.1",
 ]
