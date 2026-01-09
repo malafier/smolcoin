@@ -412,8 +412,8 @@ func (ns *NodeState) sync() {
 			}
 
 			txs, err := block.GetTransactions()
-			if err != nil {
-				slog.Warn("Sync failed: Could not parse transactions", "index", block.Index)
+			if err != nil && i != 0 {
+				slog.Warn("Sync failed: Could not parse transactions", "index", block.Index, "block", block)
 				continue
 			}
 			for _, tx := range txs {
