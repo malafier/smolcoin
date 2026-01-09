@@ -534,7 +534,10 @@ func (ns *NodeState) ledgerWithMempool() map[string]float64 {
 	ns.chainLock.RLock()
 	defer ns.chainLock.RUnlock()
 
-	ledger := ns.ledger
+	ledger := make(map[string]float64)
+	for k, v := range ns.ledger {
+		ledger[k] = v
+	}
 	if ns.miner != nil {
 		mempool := ns.miner.GetMempool()
 		for _, tx := range mempool {
