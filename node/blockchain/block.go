@@ -91,5 +91,5 @@ var Genesis = Block{
 	PrevHash:     "0",
 	Timestamp:    1761773051,
 	Transactions: "GENESIS",
-	Hash:         "a80c2a115782e2699002fc1104a53507014b0694dd706e2ab1c4172c3ce6d234",
+	Hash:         "41899db27848fc64a0b598d133d42dc9d9069b7c0f7f2af10ff7d1a6c955f53c",
 }
