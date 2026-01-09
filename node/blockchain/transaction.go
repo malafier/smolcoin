@@ -16,8 +16,8 @@ import (
 
 type Transaction struct {
 	Sender    string  `json:"sender"`
-	Reciever  string  `json:"reciever"`
-	Ammount   float64 `json:"ammount"`
+	Receiver  string  `json:"receiver"`
+	Amount    float64 `json:"amount"`
 	Timestamp int     `json:"timestamp"`
 	Signature string  `json:"signature"`
 }
@@ -30,12 +30,12 @@ func (t *Transaction) SerializeWithoutSign() ([]byte, error) {
 	data := struct {
 		Sender    string  `json:"sender"`
 		Reciever  string  `json:"reciever"`
-		Ammount   float64 `json:"ammount"`
+		Amount    float64 `json:"amount"`
 		Timestamp int     `json:"timestamp"`
 	}{
 		Sender:    t.Sender,
-		Reciever:  t.Reciever,
-		Ammount:   t.Ammount,
+		Reciever:  t.Receiver,
+		Amount:    t.Amount,
 		Timestamp: t.Timestamp,
 	}
 	return json.Marshal(data)
@@ -61,16 +61,16 @@ func (t *Transaction) HashStr() (string, error) {
 func (t *Transaction) String() string {
 	var out bytes.Buffer
 	out.WriteString("From: ")
-	out.WriteString(t.SenderId()[:10])
+	out.WriteString(t.SenderId())
 	out.WriteString("  To: ")
-	out.WriteString(t.RecieverId()[:10])
+	out.WriteString(t.ReceiverId())
 	out.WriteString("  Ammount: ")
-	out.WriteString(fmt.Sprintf("%f\n", t.Ammount))
+	out.WriteString(fmt.Sprintf("%f\n", t.Amount))
 	return out.String()
 }
 
 func (t *Transaction) Validate() error {
-	if t.Ammount < 0.0 {
+	if t.Amount < 0.0 {
 		return ErrNegativeAmmountGiven
 	}
 
@@ -106,8 +106,8 @@ func (t *Transaction) SenderId() string {
 	return keyAsId(t.Sender)
 }
 
-func (t *Transaction) RecieverId() string {
-	return keyAsId(t.Reciever)
+func (t *Transaction) ReceiverId() string {
+	return keyAsId(t.Receiver)
 }
 
 func keyAsId(key string) string {

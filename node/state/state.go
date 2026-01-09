@@ -208,10 +208,10 @@ func (ns *NodeState) AddTransaction(tx bc.Transaction) error {
 
 	ledger := ns.ledgerWithMempool()
 	record := ledger[tx.SenderId()]
-	if tx.SenderId() == bc.COINBASE_LOGIN && (tx.Ammount != bc.COINS_TO_GIVE || record-tx.Ammount < -MAX_SMOLCOINS) {
+	if tx.SenderId() == bc.COINBASE_LOGIN && (tx.Amount != bc.COINS_TO_GIVE || record-tx.Amount < -MAX_SMOLCOINS) {
 		return errors.New("Max ammount of smolcoins already reached or wrong amount of coins given")
 	}
-	if tx.SenderId() != bc.COINBASE_LOGIN && record-tx.Ammount < 0 {
+	if tx.SenderId() != bc.COINBASE_LOGIN && record-tx.Amount < 0 {
 		return errors.New("Cannot send more coins than what they have")
 	}
 
@@ -248,8 +248,8 @@ func (ns *NodeState) doUpdateLedger() {
 		}
 
 		for _, tx := range tsx {
-			ledger[tx.SenderId()] -= tx.Ammount
-			ledger[tx.RecieverId()] += tx.Ammount
+			ledger[tx.SenderId()] -= tx.Amount
+			ledger[tx.ReceiverId()] += tx.Amount
 		}
 	}
 	ns.ledger = ledger
@@ -485,8 +485,8 @@ func (ns *NodeState) ledgerWithMempool() map[string]float64 {
 	if ns.miner != nil {
 		mempool := ns.miner.GetMempool()
 		for _, tx := range mempool {
-			ledger[tx.SenderId()] -= tx.Ammount
-			ledger[tx.RecieverId()] += tx.Ammount
+			ledger[tx.SenderId()] -= tx.Amount
+			ledger[tx.ReceiverId()] += tx.Amount
 		}
 	}
 	return ledger

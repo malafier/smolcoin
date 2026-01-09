@@ -25,13 +25,13 @@ type Miner struct {
 	mu         sync.RWMutex
 }
 
-func NewMiner(difficlty int) *Miner {
+func NewMiner(difficulty int) *Miner {
 	return &Miner{
 		InTx:       make(chan Transaction),
 		InReset:    make(chan NetPayload),
 		OutBlock:   make(chan *Block),
 		mempool:    []Transaction{},
-		difficulty: difficlty,
+		difficulty: difficulty,
 		prevBlock:  &Genesis,
 	}
 }
