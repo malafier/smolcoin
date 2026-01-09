@@ -2,7 +2,16 @@ package blockchain
 
 import (
 	"encoding/json"
+	"strings"
 )
+
+func KeyAsId(key string) string {
+	key = strings.ReplaceAll(key, "-----BEGIN PUBLIC KEY-----", "")
+	key = strings.ReplaceAll(key, "-----END PUBLIC KEY-----", "")
+	key = strings.ReplaceAll(key, "\n", "")
+	key = strings.TrimSpace(key)
+	return key
+}
 
 func txsToStr(transactions []Transaction) (string, error) {
 	byteTrans, err := json.Marshal(transactions)

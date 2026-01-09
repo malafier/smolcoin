@@ -276,9 +276,10 @@ func (ns *NodeState) GetLedger() map[string]float64 {
 func (ns *NodeState) AddId(id string) {
 	ns.chainLock.Lock()
 	defer ns.chainLock.Unlock()
-	_, ok := ns.ledger[id]
+	cleanedId := bc.KeyAsId(id)
+	_, ok := ns.ledger[cleanedId]
 	if !ok {
-		ns.ledger[id] = 0.0
+		ns.ledger[cleanedId] = 0.0
 		slog.Info("[Node] Id added to ledger")
 	}
 }
