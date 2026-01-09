@@ -24,6 +24,7 @@ func NewServer(state *state.NodeState, initialPeer string) *Server {
 func (s *Server) Start() {
 	router := http.NewServeMux()
 	router.HandleFunc("GET /", s.handleIndex)
+	router.HandleFunc("GET /chain", s.handleGetChain)
 	router.HandleFunc("GET /users", s.handleGetIds)
 	router.HandleFunc("GET /ledger", s.handleGetLedger)
 	router.HandleFunc("GET /peers", s.handleGetPeers)
@@ -166,14 +167,8 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetChain(w http.ResponseWriter, r *http.Request) {
 	chain := s.State.GetChain()
-	msg, err := json.Marshal(chain)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
-		slog.Error("Failed to marshall own block chain")
-		return
-	}
 	slog.Info("[Node] Block chain sent")
-	respondWithJSON(w, http.StatusOK, msg)
+	respondWithJSON(w, http.StatusOK, chain)
 }
 
 func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
