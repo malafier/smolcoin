@@ -305,20 +305,6 @@ func (ns *NodeState) GetChain() []bc.Block {
 	return ns.blockchain
 }
 
-type ChainNet struct {
-	Chain []bc.Block `json:"chain"`
-	Len   int        `json:"length"`
-}
-
-func (c *ChainNet) Validate() error {
-	for _, block := range c.Chain {
-		if err := block.Validate(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // TODO: use it
 func (ns *NodeState) sync() {
 	ns.peersLock.RLock()
