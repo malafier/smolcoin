@@ -20,8 +20,8 @@ const COINS_TO_GIVE float64 = 2.0
 func Coinbase(reciever string) (Transaction, error) {
 	coinbase := Transaction{
 		Sender:    COINBASE_PK,
-		Reciever:  reciever,
-		Ammount:   COINS_TO_GIVE,
+		Receiver:  reciever,
+		Amount:    COINS_TO_GIVE,
 		Timestamp: int(time.Now().Unix()),
 	}
 

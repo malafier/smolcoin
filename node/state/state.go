@@ -16,6 +16,7 @@ import (
 )
 
 const MAX_SMOLCOINS float64 = 100.0
+const SYNC_THRESHOLD int = 6
 
 type Peer struct {
 	Host string `json:"host"`
@@ -272,7 +273,6 @@ func (ns *NodeState) GetLedger() map[string]float64 {
 	return ns.ledger
 }
 
-// TODO: sort things out with ids and PKs
 func (ns *NodeState) AddId(id string) {
 	ns.chainLock.Lock()
 	defer ns.chainLock.Unlock()
@@ -284,28 +284,40 @@ func (ns *NodeState) AddId(id string) {
 }
 
 func (ns *NodeState) Mine() {
-	if ns.miner == nil {
-		for {
-		}
+	if ns.miner != nil {
+		go func() {
+			slog.Info("[Node] Waiting for miner...")
+			for block := range ns.miner.OutBlock {
+				slog.Info("Mined new block", "hash", block.Hash[:16])
+				err := ns.AddBlock(block)
+				if err != nil {
+					slog.Error("[Node] Could not add MY own block", "err", err.Error())
+				}
+			}
+		}()
 	}
 
-	slog.Info("[Node] Waiting for miner...")
-	for block := range ns.miner.OutBlock {
-		slog.Info("Mined new block", "hash", block.Hash[:16])
-		err := ns.AddBlock(block)
-		if err != nil {
-			slog.Error("[Node] Could not add MY own block", "err", err.Error())
-		}
+	for {
+		time.Sleep(10 * time.Second)
+		ns.sync()
 	}
 }
 
-func (ns *NodeState) GetChain() []bc.Block {
+func (ns *NodeState) GetChain() ChainNet {
 	ns.chainLock.RLock()
 	defer ns.chainLock.RUnlock()
-	return ns.blockchain
+	if len(ns.blockchain) == 0 {
+		return ChainNet{
+			Chain: make([]bc.Block, 0),
+			Len:   0,
+		}
+	}
+	return ChainNet{
+		Chain: ns.blockchain,
+		Len:   len(ns.blockchain),
+	}
 }
 
-// TODO: use it
 func (ns *NodeState) sync() {
 	ns.peersLock.RLock()
 	peers := ns.Peers
@@ -331,14 +343,13 @@ func (ns *NodeState) sync() {
 			continue
 		}
 
-		defer resp.Body.Close()
 		var chain ChainNet
 		if err := json.NewDecoder(resp.Body).Decode(&chain); err != nil {
 			slog.Error("Failed to decode chain", "err", err)
 			continue
 		}
-
 		chains = append(chains, &chain)
+		resp.Body.Close()
 	}
 
 	ns.chainLock.Lock()
@@ -365,7 +376,7 @@ func (ns *NodeState) sync() {
 		}
 
 		// Blockchain is longer but not long enough to be trusted - skip for now
-		if chain.Len < myChainLen+6 {
+		if chain.Len < myChainLen+SYNC_THRESHOLD {
 			chains[i] = nil
 			continue
 		}
@@ -381,46 +392,103 @@ func (ns *NodeState) sync() {
 		return
 	}
 
-	// TODO: add fallback options with rest of chains
 	slices.SortFunc(chains, func(a, b *ChainNet) int { return b.Len - a.Len })
-	newChain := chains[0]
-	var mempool []bc.Transaction
-	if ns.miner != nil {
-		mempool = ns.miner.GetMempool()
-		ns.miner.Stop()
-	}
 
-	// Genesis must be set
-	if newChain.Chain[0] != bc.Genesis {
-		return
-	}
-
-	clear(ns.txHistory)
-	ns.blockchain = ns.blockchain[:1]
-	for _, block := range ns.blockchain[1:] {
-		ns.doAddBlock(&block)
-	}
-
-	if ns.miner != nil {
-		txsHash := make([]string, len(ns.txHistory))
-		i := 0
-		for hash := range ns.txHistory {
-			txsHash[i] = hash
-			i++
+	for j, _ := range chains {
+		// Staging chain
+		candidate := chains[j]
+		candidateChain := candidate.Chain
+		if len(candidateChain) == 0 || candidateChain[0].Hash != bc.Genesis.Hash {
+			continue
 		}
 
-		newMempool := make([]bc.Transaction, 0)
-		for _, tx := range mempool {
-			hash, _ := tx.HashStr()
-			if !slices.Contains(txsHash, hash) {
-				newMempool = append(newMempool, tx)
+		tempTxHistory := make(map[string]bool)
+
+		prefix := strings.Repeat("0", ns.Difficulty)
+
+		for i, block := range candidateChain {
+			if hash, err := block.CreateHash(); err != nil || hash != block.Hash {
+				slog.Warn("Sync failed: Block hash mismatch", "index", block.Index)
+				continue
+			}
+
+			txs, err := block.GetTransactions()
+			if err != nil {
+				slog.Warn("Sync failed: Could not parse transactions", "index", block.Index)
+				continue
+			}
+			for _, tx := range txs {
+				txHash, _ := tx.HashStr()
+				if tempTxHistory[txHash] {
+					slog.Warn("Sync failed: Duplicate transaction found in new chain", "tx", txHash)
+					continue
+				}
+				if err := tx.Validate(); err != nil {
+					slog.Warn("Sync failed: Invalid transaction in chain", "err", err)
+					continue
+				}
+				tempTxHistory[txHash] = true
+			}
+
+			if i == 0 {
+				continue
+			}
+
+			prevBlock := candidateChain[i-1]
+
+			if block.PrevHash != prevBlock.Hash {
+				slog.Warn("Sync failed: Broken chain link", "index", block.Index)
+				continue
+			}
+			if block.Index != prevBlock.Index+1 {
+				slog.Warn("Sync failed: Index mismatch", "index", block.Index)
+				continue
+			}
+			if !strings.HasPrefix(block.Hash, prefix) {
+				slog.Warn("Sync failed: Insufficient difficulty", "index", block.Index)
+				continue
 			}
 		}
-		lastBlock := ns.blockchain[len(ns.blockchain)]
 
-		ns.miner.InReset <- bc.NetPayload{Block: &lastBlock, NewTsx: newMempool}
+		// Final check if current chain is still shorter
+		ns.chainLock.RLock()
+		if len(ns.blockchain)+SYNC_THRESHOLD >= len(candidateChain) {
+			continue
+		}
+		ns.chainLock.RUnlock()
+
+		// Commit staging
+		ns.chainLock.Lock()
+		slog.Info("Replacing chain with new longer chain", "old_len", len(ns.blockchain), "new_len", len(candidateChain))
+
+		var mempool []bc.Transaction
+		if ns.miner != nil {
+			mempool = ns.miner.GetMempool()
+			ns.miner.Stop()
+		}
+
+		ns.blockchain = candidateChain
+		ns.txHistory = tempTxHistory
+
+		ns.doUpdateLedger()
+
+		if ns.miner != nil {
+			newMempool := make([]bc.Transaction, 0)
+			for _, tx := range mempool {
+				hash, _ := tx.HashStr()
+				if !ns.txHistory[hash] { // Check against the new history
+					newMempool = append(newMempool, tx)
+				}
+			}
+
+			lastBlock := ns.blockchain[len(ns.blockchain)-1]
+			ns.miner.InReset <- bc.NetPayload{Block: &lastBlock, NewTsx: newMempool}
+		}
+		ns.chainLock.Unlock()
+
+		break
 	}
-	ns.doUpdateLedger()
+
 }
 
 func (ns *NodeState) broadcast(uri string, payload []byte) {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	bc "node/blockchain"
@@ -34,7 +33,7 @@ func (s *Server) Start() {
 
 	adminRouter := http.NewServeMux()
 	adminRouter.HandleFunc("POST /connect", s.handleConnect)
-	router.Handle("/admin/", http.StripPrefix("/admin", s.checkAdmin(adminRouter)))
+	router.Handle("POST /admin/", http.StripPrefix("/admin", s.checkAdmin(adminRouter)))
 
 	server := http.Server{
 		Addr:    s.State.Addr(),
@@ -167,16 +166,11 @@ func (s *Server) handleNewBlock(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetChain(w http.ResponseWriter, r *http.Request) {
 	chain := s.State.GetChain()
-	chainStr, err := json.Marshal(chain)
+	msg, err := json.Marshal(chain)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		slog.Error("Failed to marshall own block chain")
 		return
-	}
-
-	msg := map[string]string{
-		"length": strconv.Itoa(len(chain)),
-		"chain":  string(chainStr),
 	}
 	slog.Info("[Node] Block chain sent")
 	respondWithJSON(w, http.StatusOK, msg)
