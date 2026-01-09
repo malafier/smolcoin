@@ -306,12 +306,6 @@ func (ns *NodeState) Mine() {
 func (ns *NodeState) GetChain() ChainNet {
 	ns.chainLock.RLock()
 	defer ns.chainLock.RUnlock()
-	if len(ns.blockchain) == 0 {
-		return ChainNet{
-			Chain: make([]bc.Block, 0),
-			Len:   0,
-		}
-	}
 	return ChainNet{
 		Chain: ns.blockchain,
 		Len:   len(ns.blockchain),
@@ -353,39 +347,43 @@ func (ns *NodeState) sync() {
 	}
 
 	ns.chainLock.Lock()
-	defer ns.chainLock.Unlock()
 	myChainLen := len(ns.blockchain)
-
 	for i, chain := range chains {
-		// Blockchain is roughly the same - skip
-		if chain.Len == myChainLen && chain.Chain[chain.Len-1].Hash == ns.blockchain[myChainLen].Hash {
+		// Invalid
+		if chain.Len != len(chain.Chain) {
+			slog.Debug("Sync candidate failed: Invalid len")
 			chains[i] = nil
 			continue
 		}
 
-		// Invalid
-		if chain.Len != len(chain.Chain) {
+		// Blockchain is roughly the same - skip
+		if chain.Len == myChainLen && chain.Chain[chain.Len-1].Hash == ns.blockchain[myChainLen-1].Hash {
+			slog.Debug("Sync candidate failed: Similar chains")
 			chains[i] = nil
 			continue
 		}
 
 		// Blockchain is shorter - skip
 		if chain.Len < myChainLen {
+			slog.Debug("Sync candidate failed: Incoming chain is shorter")
 			chains[i] = nil
 			continue
 		}
 
 		// Blockchain is longer but not long enough to be trusted - skip for now
 		if chain.Len < myChainLen+SYNC_THRESHOLD {
+			slog.Debug("Sync candidate failed: Incoming chain not long enough")
 			chains[i] = nil
 			continue
 		}
 
 		// Blockchain invalid
 		if err := chain.Validate(); err != nil {
+			slog.Debug("Sync candidate failed: Chain is invalid")
 			chains[i] = nil
 		}
 	}
+	ns.chainLock.Unlock()
 
 	chains = slices.DeleteFunc(chains, func(c *ChainNet) bool { return c == nil })
 	if len(chains) == 0 {
@@ -394,7 +392,7 @@ func (ns *NodeState) sync() {
 
 	slices.SortFunc(chains, func(a, b *ChainNet) int { return b.Len - a.Len })
 
-	for j, _ := range chains {
+	for j := range chains {
 		// Staging chain
 		candidate := chains[j]
 		candidateChain := candidate.Chain
