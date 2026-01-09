@@ -158,4 +158,4 @@ Smolcoins: {'No info' if self.coins is None else self.coins}
         ledger = get_ledger(self.node_adr, self.chosen_id[PK])
         if ledger is None:
             return
-        self.coins = float(ledger[self.chosen_id[PK]])
+        self.coins = float(ledger[view_key(self.chosen_id[PK])])
