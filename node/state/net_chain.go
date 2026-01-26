@@ -24,3 +24,15 @@ func (c *ChainNet) Validate() error {
 	}
 	return nil
 }
+
+func (c *ChainNet) TransactionsCount() int {
+	counter := 0
+	for _, block := range c.Chain {
+		txs, err := block.ParseTransactions()
+		if err != nil {
+			return -1
+		}
+		counter += len(txs)
+	}
+	return counter
+}

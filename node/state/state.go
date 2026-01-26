@@ -349,6 +349,12 @@ func (ns *NodeState) sync() {
 
 	ns.chainLock.Lock()
 	myChainLen := len(ns.blockchain)
+	myTxsCount := 0
+	for _, v := range ns.txHistory {
+		if v == true {
+			myTxsCount += 1
+		}
+	}
 	for i, chain := range chains {
 		// Invalid
 		if chain.Len != len(chain.Chain) {
@@ -374,6 +380,13 @@ func (ns *NodeState) sync() {
 		// Blockchain is longer but not long enough to be trusted - skip for now
 		if chain.Len < myChainLen+SYNC_THRESHOLD {
 			slog.Debug("Sync candidate failed: Incoming chain not long enough")
+			chains[i] = nil
+			continue
+		}
+
+		// Blockchain has less transactions than current one - why bother?
+		if chain.TransactionsCount() < myTxsCount {
+			slog.Debug("Sync candidate failed: Incoming chain has less transactions")
 			chains[i] = nil
 			continue
 		}
