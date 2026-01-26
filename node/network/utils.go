@@ -60,3 +60,7 @@ func parsePeer(addr string) (string, int, error) {
 	}
 	return host, port, nil
 }
+
+func checkPeer() {
+	//
+}

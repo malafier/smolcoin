@@ -86,6 +86,10 @@ func (b *Block) GetTransactions() ([]Transaction, error) {
 	return strToTxs(b.Transactions)
 }
 
+func (b *Block) Corrupt() {
+	b.Hash = "0000000000CORRUPTED000BLOCK000"
+}
+
 var Genesis = Block{
 	Index:        0,
 	PrevHash:     "0",

@@ -24,6 +24,7 @@ func main() {
 	diff := flag.Int("d", DEFAULT_DIFFICULTY, "Block mining difficulty")
 	peer := flag.String("P", "", "Address to connect to peer (e.g., 127.0.0.1:3001)")
 	mine := flag.Bool("M", false, "Flag if node is a miner")
+	malicious := flag.Bool("m", false, "Flag if node is malicious")
 	flag.Parse()
 
 	// Logging
@@ -49,10 +50,10 @@ func main() {
 		go miner.ListenAndMine()
 	}
 
-	state := NewNodeState(*host, *port, miner)
-
+	state := NewNodeState(*host, *port, miner, *malicious)
 	server := NewServer(state, *peer)
-	go server.Start()
 
+	// Run
+	go server.Start()
 	state.Mine()
 }

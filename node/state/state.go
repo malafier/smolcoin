@@ -44,9 +44,12 @@ type NodeState struct {
 	peersLock sync.RWMutex
 
 	miner *bc.Miner
+
+	// Testing params
+	Malicious bool
 }
 
-func NewNodeState(host string, port int, miner *bc.Miner) *NodeState {
+func NewNodeState(host string, port int, miner *bc.Miner, malicious bool) *NodeState {
 	node := &NodeState{
 		Host:       host,
 		Port:       port,
@@ -55,6 +58,7 @@ func NewNodeState(host string, port int, miner *bc.Miner) *NodeState {
 		Peers:      make(map[string]Peer),
 		ledger:     make(map[string]float64),
 		miner:      miner,
+		Malicious:  malicious,
 	}
 	node.PeerHeader = make(http.Header)
 	node.PeerHeader.Set("Peer", node.Addr())
@@ -75,8 +79,12 @@ func (ns *NodeState) AddPeer(host string, port int) error {
 
 	ns.peersLock.Lock()
 	defer ns.peersLock.Unlock()
-	ns.Peers[addr] = newPeer
+	_, present := ns.Peers[addr]
+	if present {
+		return nil
+	}
 
+	ns.Peers[addr] = newPeer
 	slog.Info("[Node] Added new peer", "peer", addr)
 	return nil
 }
@@ -139,6 +147,9 @@ func (ns *NodeState) AddBlock(block *bc.Block) error {
 	}
 
 	ns.UpdateLedger()
+	if ns.Malicious {
+		block.Corrupt()
+	}
 	payload, err := block.Serialize()
 	if err != nil {
 		return fmt.Errorf("Failed to serialize new block. Unable to broadcast: %s", err.Error())
